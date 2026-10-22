@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Sonic.exe: Nightmare Beginning Remake — Unofficial Browser Fan Project</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: #07070b;
+    color: #b9b9c6;
+    font-family: "Consolas", "Courier New", monospace;
+    overflow: hidden;
+  }
+  #wrap {
+    position: fixed; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 10px;
+  }
+  #stage {
+    position: relative;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    background: #000;
+    box-shadow: 0 0 0 1px #2a2a38, 0 18px 60px rgba(0,0,0,.85);
+  }
+  canvas { display: block; image-rendering: pixelated; image-rendering: crisp-edges; }
+  #overlay {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(4,4,8,.94);
+    cursor: pointer;
+    text-align: center;
+  }
+  #overlay.hidden { display: none; }
+  .card { max-width: 560px; padding: 22px 26px; }
+  h1 {
+    font-size: 19px; margin: 0 0 6px; color: #ff4d4d;
+    letter-spacing: .06em; text-transform: uppercase;
+  }
+  h2 { font-size: 15px; margin: 18px 0 6px; color: #e8e8f2; }
+  p { font-size: 13px; line-height: 1.55; margin: 8px 0; }
+  .big {
+    display: block;
+    font-size: 15px;
+    font-weight: bold;
+    color: #ffe27a;
+    letter-spacing: .04em;
+    margin: 10px 0 4px;
+  }
+  .disclaimer { border-left: 3px solid #ff4d4d; padding-left: 12px; }
+  .dim { color: #6d6d80; font-size: 12px; }
+  a { color: #7fb4ff; }
+  #bar { font-size: 12px; color: #6d6d80; min-height: 16px; }
+  #hud {
+    position: absolute; left: 6px; top: 6px;
+    font-size: 11px; color: rgba(255,255,255,.42);
+    pointer-events: none; text-shadow: 0 1px 0 #000;
+  }
+  .keys { font-size: 12px; color: #55556a; }
+  kbd {
+    background: #1b1b26; border: 1px solid #33334a; border-bottom-width: 2px;
+    border-radius: 3px; padding: 0 5px; color: #9a9ab0; font-size: 11px;
+  }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="stage">
+    <canvas id="game" width="640" height="480"></canvas>
+    <div id="hud"></div>
+    <div id="overlay">
+      <div class="card">
+        <span class="big">НЕОФИЦИАЛЬНЫЙ ФАН-ПРОЕКТ</span>
+        <span class="big">UNOFFICIAL FAN PROJECT — NOT AFFILIATED</span>
+        <div class="disclaimer">
+          <p>Это <b>неофициальный</b> браузерный порт фан-игры
+          <b>Sonic.exe: Nightmare Beginning Remake</b>.
+          Мы <b>не претендуем</b> на права на оригинальную игру и её ассеты.</p>
+          <p>Оригинал: <a href="https://gamejolt.com/games/NBR_UIM/516580" target="_blank" rel="noopener">Sonic.exe: Nightmare Beginning Remake</a>
+          — автор <a href="https://gamejolt.com/@JaizKoys" target="_blank" rel="noopener">JaizKoys</a>.
+          Права на персонажей и музыку SEGA / Nintendo принадлежат их правообладателям.</p>
+        </div>
+        <h2>Что нового</h2>
+        <p>Порядок работы в браузере и <b>неофициальные концовки</b> — в оригинале их нет вообще.</p>
+        <h2>Управление</h2>
+        <p class="keys">
+          <kbd>←</kbd> <kbd>→</kbd> движение &nbsp; <kbd>↑</kbd> <kbd>↓</kbd> / <kbd>Z</kbd> прыжок &nbsp;
+          <kbd>X</kbd> спуск &nbsp; <kbd>Shift</kbd> бег &nbsp; <kbd>Ctrl</kbd> рывок
+        </p>
+        <p class="keys"><kbd>F1</kbd> / <kbd>F2</kbd> — неофициальные фан-концовки (в любой момент)</p>
+        <p class="dim">Нажми, чтобы включить звук и начать</p>
+      </div>
+    </div>
+  </div>
+  <div id="bar">Загрузка…</div>
+</div>
+
+<script>
+  // The asset tree lives in ../sonic_nbr_web/assets/, so the page itself is
+  // served from the sonic_nbr_web folder.
+  window.NBR_ASSET_ROOT = 'assets/';
+</script>
+
+<!-- runtime -->
+<script src="runtime/mm_core.js"></script>
+<script src="runtime/mm_interp.js"></script>
+<script src="runtime/mm_builtins.js"></script>
+<script src="runtime/mm_audio.js"></script>
+<script src="runtime/mm_nbr.js"></script>
+<script src="runtime/mm_fanending.js"></script>
+
+<!-- generated game package -->
+<script src="game/code.js"></script>
+<script src="game/sprites.js"></script>
+<script src="game/objects.js"></script>
+<script src="game/rooms.js"></script>
+<script src="game/scripts.js"></script>
+<script src="game/sounds.js"></script>
+<script src="game/fonts.js"></script>
+<script src="game/assets.js"></script>
+
+<script>
+(function () {
+  'use strict';
+  var canvas = document.getElementById('game');
+  var stage = document.getElementById('stage');
+  var overlay = document.getElementById('overlay');
+  var bar = document.getElementById('bar');
+  var hud = document.getElementById('hud');
+
+  // --- integer scaling -------------------------------------------------
+  function fit() {
+    var barH = bar ? (bar.offsetHeight || 16) : 16;
+    var availW = window.innerWidth - 24;
+    var availH = window.innerHeight - barH - 40;
+    if (availW < 80) availW = 80;
+    if (availH < 60) availH = 60;
+    var raw = Math.min(availW / 640, availH / 480);
+    var scale = raw >= 1 ? Math.floor(raw) : raw;
+    var w = Math.max(1, Math.floor(640 * scale));
+    var h = Math.max(1, Math.floor(480 * scale));
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
+    stage.style.width = w + 'px';
+    stage.style.height = h + 'px';
+  }
+  window.addEventListener('resize', fit);
+  fit();
+
+  // --- boot ------------------------------------------------------------
+  var MM = window.MM;
+  var summary = MM.debug ? MM.debug.summary() : {};
+  bar.textContent = 'Объектов: ' + (summary.objects || 0) +
+                    ' · комнат: ' + (summary.rooms || 0) +
+                    ' · спрайтов: ' + (summary.sprites || 0) +
+                    ' · звуков: ' + (summary.sounds || 0) +
+                    ' · скриптов: ' + (summary.scripts || 0);
+
+  MM.nbrBoot({ canvas: canvas, room: 'LanguageSelect_19', width: 640, height: 480, fps: 60 });
+
+  // --- hud -------------------------------------------------------------
+  setInterval(function () {
+    if (!MM.state || !MM.state.room) return;
+    hud.textContent = MM.state.room.name + ' · ' + MM.state.frame;
+  }, 250);
+
+  // --- audio unlock + start --------------------------------------------
+  function start() {
+    overlay.classList.add('hidden');
+    if (MM.audio && MM.audio.unlock) MM.audio.unlock();
+    canvas.focus();
+  }
+  overlay.addEventListener('click', start);
+  window.addEventListener('keydown', function (e) {
+    if (!overlay.classList.contains('hidden')) start();
+  }, { once: false });
+
+  window.NBR_DIAG = function () {
+    return { summary: MM.debug ? MM.debug.summary() : null, warnings: MM.warnings.slice(0, 40) };
+  };
+})();
+</script>
+</body>
+</html>

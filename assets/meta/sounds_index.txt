@@ -1,0 +1,143 @@
+idx	name	flags	type	file	volume	pitch	groupID	audioID	bytes	magic	origin	ext
+0	SFX_Jump	IsEmbedded, Regular	.wav	SFX_Jump.wav	1	0	1	0	76764	52-49-46-46	embedded	.wav
+1	SFX_Rolling	IsEmbedded, Regular	.wav	SFX_Rolling.wav	1	0	1	1	178108	52-49-46-46	embedded	.wav
+2	SFX_Spindash	IsEmbedded, Regular	.wav	SFX_Spindash.wav	1	0	1	2	217692	52-49-46-46	embedded	.wav
+3	SFX_GreenHill	Regular	.mp3	SFX_GreenHill.ogg	1	0	1	2	662408	4F-67-67-53	external	.ogg
+4	SFX_SEGA	Regular	.mp3	SFX_SEGA.ogg	1	0	1	2	44531	4F-67-67-53	external	.ogg
+5	SFX_TitleScreen	IsEmbedded, Regular	.wav	SFX_TitleScreen.wav	1	0	1	3	1201128	52-49-46-46	embedded	.wav
+6	SFX_DataSelect	Regular	.mp3	SFX_DataSelect.ogg	1	0	1	3	1005766	4F-67-67-53	external	.ogg
+7	SFX_DataMove	IsEmbedded, Regular	.wav	SFX_DataMove.wav	1	0	1	4	35374	52-49-46-46	embedded	.wav
+8	SFX_Laugh	IsEmbedded, Regular	.wav	SFX_Laugh.wav	1	0	1	5	341016	52-49-46-46	embedded	.wav
+9	SFX_Spring	IsEmbedded, Regular	.wav	SFX_Spring.wav	1	0	1	6	165850	52-49-46-46	embedded	.wav
+10	SFX_LoseRings	IsEmbedded, Regular	.WAV	SFX_LoseRings.WAV	1	0	1	7	152136	52-49-46-46	embedded	.wav
+11	SFX_Hit	IsEmbedded, Regular	.wav	SFX_Hit.wav	1	0	1	8	79462	52-49-46-46	embedded	.wav
+12	SFX_TrapRing	IsEmbedded, Regular	.wav	SFX_TrapRing.wav	1	0	1	9	47194	52-49-46-46	embedded	.wav
+13	SFX_BotHit	IsEmbedded, Regular	.wav	SFX_BotHit.wav	1	0	1	10	58830	52-49-46-46	embedded	.wav
+14	SFX_BoxBroke	IsEmbedded, Regular	.wav	SFX_BoxBroke.wav	1	0	1	11	32366	52-49-46-46	embedded	.wav
+15	SFX_Ring	IsEmbedded, Regular	.wav	SFX_Ring.wav	1	0	1	12	54484	52-49-46-46	embedded	.wav
+16	SFX_Hill	Regular	.mp3	SFX_Hill.ogg	1	0	1	12	1013998	4F-67-67-53	external	.ogg
+17	SFX_Continue	IsEmbedded, Regular	.wav	SFX_Continue.wav	1	0	1	13	387960	52-49-46-46	embedded	.wav
+18	SFX_Locked	IsEmbedded, Regular	.wav	SFX_Locked.wav	1	0	1	14	53008	52-49-46-46	embedded	.wav
+19	SFX_Alert	IsEmbedded, Regular	.wav	SFX_Alert.wav	1	0	1	15	134626	52-49-46-46	embedded	.wav
+20	SFX_TTP	IsEmbedded, Regular	.wav	SFX_TTP.wav	1	0	1	16	836066	52-49-46-46	embedded	.wav
+21	SFX_Forest	Regular	.mp3	SFX_Forest.ogg	1	0	1	16	237090	4F-67-67-53	external	.ogg
+22	SFX_BombTimer	IsEmbedded, Regular	.wav	SFX_BombTimer.wav	1	0	1	17	238128	52-49-46-46	embedded	.wav
+23	SFX_Bang	Regular	.mp3	SFX_Bang.ogg	1	0	1	17	74718	4F-67-67-53	external	.ogg
+24	SFX_Fire	IsEmbedded, Regular	.wav	SFX_Fire.wav	1	0	1	18	451514	52-49-46-46	embedded	.wav
+25	SFX_HS1	Regular	.mp3	SFX_HS1.ogg	1	0	1	18	259426	4F-67-67-53	external	.ogg
+26	SFX_Chase1	Regular	.wav	SFX_Chase1.ogg	1	0	1	18	584991	4F-67-67-53	external	.ogg
+27	SFX_Cont	Regular	.wav	SFX_Cont.ogg	1	0	1	18	125505	4F-67-67-53	external	.ogg
+28	SFX_GU	IsEmbedded, Regular	.wav	SFX_GU.wav	1	0	1	19	4924806	52-49-46-46	embedded	.wav
+29	SFX_HS2	Regular	.mp3	SFX_HS2.ogg	1	0	1	19	439538	4F-67-67-53	external	.ogg
+30	SFX_Warp	IsEmbedded, Regular	.wav	SFX_Warp.wav	1	0	1	20	101606	52-49-46-46	embedded	.wav
+31	SFX_Bushes	IsEmbedded, Regular	.wav	SFX_Bushes.wav	1	0	1	21	35078	52-49-46-46	embedded	.wav
+32	SFX_Alarm	IsEmbedded, Regular	.wav	SFX_Alarm.wav	1	0	1	22	70026	52-49-46-46	embedded	.wav
+33	SFX_HS_Chase	Regular	.mp3	SFX_HS_Chase.ogg	1	0	1	22	282977	4F-67-67-53	external	.ogg
+34	SFX_HS_Chase2	Regular	.mp3	SFX_HS_Chase2.ogg	1	0	1	22	316101	4F-67-67-53	external	.ogg
+35	SFX_HS_NYM	IsEmbedded, Regular	.wav	SFX_HS_NYM.wav	1	0	1	23	405528	52-49-46-46	embedded	.wav
+36	SFX_HS_GJT	IsEmbedded, Regular	.wav	SFX_HS_GJT.wav	1	0	1	24	343064	52-49-46-46	embedded	.wav
+37	SFX_HS_WaYT	IsEmbedded, Regular	.wav	SFX_HS_WaYT.wav	1	0	1	25	337944	52-49-46-46	embedded	.wav
+38	SFX_HS_YCHF	IsEmbedded, Regular	.wav	SFX_HS_YCHF.wav	1	0	1	26	368664	52-49-46-46	embedded	.wav
+39	SFX_HS_ME	IsEmbedded, Regular	.wav	SFX_HS_ME.wav	1	0	1	27	520216	52-49-46-46	embedded	.wav
+40	SFX_SuperTrapRing	IsEmbedded, Regular	.wav	SFX_SuperTrapRing.wav	1	0	1	28	236116	52-49-46-46	embedded	.wav
+41	SFX_TrapChoise	Regular	.mp3	SFX_TrapChoise.ogg	1	0	1	28	420037	4F-67-67-53	external	.ogg
+42	SFX_TC_Race	Regular	.mp3	SFX_TC_Race.ogg	1	0	1	28	215350	4F-67-67-53	external	.ogg
+43	SFX_RR_Race	Regular	.mp3	SFX_RR_Race.ogg	1	0	1	28	795518	4F-67-67-53	external	.ogg
+44	SFX_Grab	IsEmbedded, Regular	.wav	SFX_Grab.wav	1	0	1	29	8818	52-49-46-46	embedded	.wav
+45	SFX_Signpost	IsEmbedded, Regular	.wav	SFX_Signpost.wav	1	0	1	30	174290	52-49-46-46	embedded	.wav
+46	SFX_ExeFinish	Regular	.mp3	SFX_ExeFinish.ogg	1	0	1	30	45878	4F-67-67-53	external	.ogg
+47	SFX_RaceFail	IsEmbedded, Regular	.wav	SFX_RaceFail.wav	1	0	1	31	913402	52-49-46-46	embedded	.wav
+48	SFX_Repuls	IsEmbedded, Regular	.wav	SFX_Repuls.wav	1	0	1	32	23602	52-49-46-46	embedded	.wav
+49	SFX_Slash	IsEmbedded, Regular	.wav	SFX_Slash.wav	1	0	1	33	325686	52-49-46-46	embedded	.wav
+50	SFX_Asshole	IsEmbedded, Regular	.wav	SFX_Asshole.wav	1	0	1	34	1136664	52-49-46-46	embedded	.wav
+51	SFX_TTS	IsEmbedded, Regular	.wav	SFX_TTS.wav	1	0	1	35	8273862	52-49-46-46	embedded	.wav
+52	SFX_GPU	IsEmbedded, Regular	.wav	SFX_GPU.wav	1	0	1	36	282218	52-49-46-46	embedded	.wav
+53	SFX_GS	IsEmbedded, Regular	.wav	SFX_GS.wav	1	0	1	37	340640	52-49-46-46	embedded	.wav
+54	SFX_GCU	IsEmbedded, Regular	.wav	SFX_GCU.wav	1	0	1	38	597918	52-49-46-46	embedded	.wav
+55	SFX_Broke	IsEmbedded, Regular	.wav	SFX_Broke.wav	1	0	1	39	176356	52-49-46-46	embedded	.wav
+56	SFX_WallFall	IsEmbedded, Regular	.wav	SFX_WallFall.wav	1	0	1	40	54474	52-49-46-46	embedded	.wav
+57	SFX_BlowsUp	IsEmbedded, Regular	.wav	SFX_BlowsUp.wav	1	0	1	41	60238	52-49-46-46	embedded	.wav
+58	SFX_Disappear	IsEmbedded, Regular	.wav	SFX_Disappear.wav	1	0	1	42	488516	52-49-46-46	embedded	.wav
+59	SFX_CrazyLaugh	IsEmbedded, Regular	.wav	SFX_CrazyLaugh.wav	1	0	1	43	762446	52-49-46-46	embedded	.wav
+60	SFX_LastVoid	Regular	.mp3	SFX_LastVoid.ogg	1	0	1	43	1140680	4F-67-67-53	external	.ogg
+61	SFX_YTS1	IsDecompressedOnLoad, Regular	.wav	SFX_YTS1.wav	1	0	1	44	63994	4F-67-67-53	embedded	.ogg
+62	SFX_YTS2	IsDecompressedOnLoad, Regular	.wav	SFX_YTS2.wav	1	0	1	45	66913	4F-67-67-53	embedded	.ogg
+63	SFX_Scream	Regular	.mp3	SFX_Scream.ogg	1	0	1	45	45258	4F-67-67-53	external	.ogg
+64	SFX_LDT1	IsEmbedded, Regular	.wav	SFX_LDT1.wav	1	0	1	46	546840	52-49-46-46	embedded	.wav
+65	SFX_LDT2	IsEmbedded, Regular	.wav	SFX_LDT2.wav	1	0	1	47	559128	52-49-46-46	embedded	.wav
+66	SFX_Wowowwo	IsEmbedded, Regular	.wav	SFX_Wowowwo.wav	1	0	1	48	119832	52-49-46-46	embedded	.wav
+67	SFX_TailRipped	IsEmbedded, Regular	.wav	SFX_TailRipped.wav	1	0	1	49	213328	52-49-46-46	embedded	.wav
+68	SFX_YCR	Regular	.mp3	SFX_YCR.ogg	1	0	1	49	411609	4F-67-67-53	external	.ogg
+69	SFX_ScrapBrain	Regular	.mp3	SFX_ScrapBrain.ogg	1	0	1	49	955715	4F-67-67-53	external	.ogg
+70	SFX_Button	IsEmbedded, Regular	.wav	SFX_Button.wav	1	0	1	50	3108	52-49-46-46	embedded	.wav
+71	SFX_FireThrow	IsEmbedded, Regular	.wav	SFX_FireThrow.wav	1	0	1	51	53592	52-49-46-46	embedded	.wav
+72	SFX_BuzzSaw	IsEmbedded, Regular	.wav	SFX_BuzzSaw.wav	1	0	1	52	58186	52-49-46-46	embedded	.wav
+73	SFX_BrokeRing	IsEmbedded, Regular	.wav	SFX_BrokeRing.wav	1	0	1	53	2727440	52-49-46-46	embedded	.wav
+74	SFX_SDim1	Regular	.mp3	SFX_SDim1.ogg	1	0	1	53	948956	4F-67-67-53	external	.ogg
+75	SFX_SDim2	Regular	.mp3	SFX_SDim2.ogg	1	0	1	53	140214	4F-67-67-53	external	.ogg
+76	SFX_Heroes	Regular	.mp3	SFX_Heroes.ogg	1	0	1	53	759318	4F-67-67-53	external	.ogg
+77	SFX_SarkHit	IsEmbedded, Regular	.wav	SFX_SarkHit.wav	1	0	1	54	58118	52-49-46-46	embedded	.wav
+78	SFX_SarkLaugh	IsEmbedded, Regular	.wav	SFX_SarkLaugh.wav	1	0	1	55	407100	52-49-46-46	embedded	.wav
+79	SFX_LVTails1	IsEmbedded, Regular	.wav	SFX_LVTails1.wav	1	0	1	56	822164	52-49-46-46	embedded	.wav
+80	SFX_LVTails2	IsEmbedded, Regular	.wav	SFX_LVTails2.wav	1	0	1	57	769570	52-49-46-46	embedded	.wav
+81	SFX_LVTails3	IsEmbedded, Regular	.wav	SFX_LVTails3.wav	1	0	1	58	501066	52-49-46-46	embedded	.wav
+82	SFX_LVTails4	IsEmbedded, Regular	.wav	SFX_LVTails4.wav	1	0	1	59	1184784	52-49-46-46	embedded	.wav
+83	SFX_LVKnuckles	IsEmbedded, Regular	.wav	SFX_LVKnuckles.wav	1	0	1	60	1731266	52-49-46-46	embedded	.wav
+84	SFX_LVEggman	IsEmbedded, Regular	.wav	SFX_LVEggman.wav	1	0	1	61	1256130	52-49-46-46	embedded	.wav
+85	SFX_LVSonic	IsEmbedded, Regular	.wav	SFX_LVSonic.wav	1	0	1	62	2037102	52-49-46-46	embedded	.wav
+86	SFX_TTP2	IsEmbedded, Regular	.wav	SFX_TTP2.wav	1	0	1	63	429080	52-49-46-46	embedded	.wav
+87	SFX_TornadoStart	IsEmbedded, Regular	.wav	SFX_TornadoStart.wav	1	0	1	64	129352	52-49-46-46	embedded	.wav
+88	SFX_EnergoChin	IsEmbedded, Regular	.wav	SFX_EnergoChin.wav	1	0	1	65	22304	52-49-46-46	embedded	.wav
+89	SFX_Noice	Regular	.mp3	SFX_Noice.ogg	1	0	1	65	48114	4F-67-67-53	external	.ogg
+90	SFX_YCR_Piano1	Regular	.mp3	SFX_YCR_Piano1.ogg	1	0	1	65	112789	4F-67-67-53	external	.ogg
+91	SFX_YCR_Piano2	Regular	.mp3	SFX_YCR_Piano2.ogg	1	0	1	65	101246	4F-67-67-53	external	.ogg
+92	SFX_YCR_Piano3	Regular	.mp3	SFX_YCR_Piano3.ogg	1	0	1	65	84564	4F-67-67-53	external	.ogg
+93	SFX_PsyRoar	IsEmbedded, Regular	.wav	SFX_PsyRoar.wav	1	0	1	66	325686	52-49-46-46	embedded	.wav
+94	SFX_HighestAlert	IsEmbedded, Regular	.wav	SFX_HighestAlert.wav	1	0	1	67	382892	52-49-46-46	embedded	.wav
+95	SFX_MyHeaven	Regular	.mp3	SFX_MyHeaven.ogg	1	0	1	67	1327552	4F-67-67-53	external	.ogg
+96	SFX_CloneAppearence	IsEmbedded, Regular	.wav	SFX_CloneAppearence.wav	1	0	1	68	505690	52-49-46-46	embedded	.wav
+97	SFX_ExeHit	IsEmbedded, Regular	.wav	SFX_ExeHit.wav	1	0	1	69	63598	52-49-46-46	embedded	.wav
+98	SFX_EGGB1	Regular	.mp3	SFX_EGGB1.ogg	1	0	1	69	277525	4F-67-67-53	external	.ogg
+99	SFX_EGGReverseTheme	Regular	.mp3	SFX_EGGReverseTheme.ogg	1	0	1	69	313619	4F-67-67-53	external	.ogg
+100	SFX_MSonic_Rolling	IsEmbedded, Regular	.wav	SFX_MSonic_Rolling.wav	1	0	1	70	129898	52-49-46-46	embedded	.wav
+101	SFX_MSonic_Spindash	IsEmbedded, Regular	.wav	SFX_MSonic_Spindash.wav	1	0	1	71	108344	52-49-46-46	embedded	.wav
+102	SFX_MSonic_Pulse	IsEmbedded, Regular	.wav	SFX_MSonic_Pulse.wav	1	0	1	72	105920	52-49-46-46	embedded	.wav
+103	SFX_PervisionBase1	Regular	.mp3	SFX_PervisionBase1.ogg	1	0	1	72	1214784	4F-67-67-53	external	.ogg
+104	SFX_BaseAlarm	IsEmbedded, Regular	.wav	SFX_BaseAlarm.wav	1	0	1	73	804604	52-49-46-46	embedded	.wav
+105	SFX_BaseIntruder	IsEmbedded, Regular	.wav	SFX_BaseIntruder.wav	1	0	1	74	200728	52-49-46-46	embedded	.wav
+106	SFX_BasePursuit	Regular	.mp3	SFX_BasePursuit.ogg	1	0	1	74	1153599	4F-67-67-53	external	.ogg
+107	SFX_FireShield	IsEmbedded, Regular	.wav	SFX_FireShield.wav	1	0	1	75	63258	52-49-46-46	embedded	.wav
+108	SFX_BampOut	IsEmbedded, Regular	.wav	SFX_BampOut.wav	1	0	1	76	74166	52-49-46-46	embedded	.wav
+109	SFX_Bumper	IsEmbedded, Regular	.wav	SFX_Bumper.wav	1	0	1	77	28136	52-49-46-46	embedded	.wav
+110	SFX_DefendShield	IsEmbedded, Regular	.wav	SFX_DefendShield.wav	1	0	1	78	63466	52-49-46-46	embedded	.wav
+111	SFX_MHPDing	IsEmbedded, Regular	.wav	SFX_MHPDing.wav	1	0	1	79	151434	52-49-46-46	embedded	.wav
+112	SFX_DemonicSence	IsEmbedded, Regular	.wav	SFX_DemonicSence.wav	1	0	1	80	386324	52-49-46-46	embedded	.wav
+113	SFX_SpikeSound	IsEmbedded, Regular	.wav	SFX_SpikeSound.wav	1	0	1	81	37810	52-49-46-46	embedded	.wav
+114	SFX_WeirdBlastNoice	IsEmbedded, Regular	.wav	SFX_WeirdBlastNoice.wav	0,6	0	1	82	48634	52-49-46-46	embedded	.wav
+115	SFX_RobotExplode	IsEmbedded, Regular	.wav	SFX_RobotExplode.wav	1	0	1	83	230438	52-49-46-46	embedded	.wav
+116	SFX_ExetiorRoar	IsEmbedded, Regular	.wav	SFX_ExetiorRoar.wav	1	0	1	84	587800	52-49-46-46	embedded	.wav
+117	SFX_BasePursuitEnd	Regular	.mp3	SFX_BasePursuitEnd.ogg	1	0	1	84	159758	4F-67-67-53	external	.ogg
+118	SFX_MYCR_Ins1	IsEmbedded, Regular	.wav	SFX_MYCR_Ins1.wav	1	0	1	85	775192	52-49-46-46	embedded	.wav
+119	SFX_MYCR_Ins2	IsEmbedded, Regular	.wav	SFX_MYCR_Ins2.wav	1	0	1	86	585752	52-49-46-46	embedded	.wav
+120	SFX_Ellipsis	Regular	.mp3	SFX_Ellipsis.ogg	1	0	1	86	1125495	4F-67-67-53	external	.ogg
+121	SFX_Elevator	IsEmbedded, Regular	.wav	SFX_Elevator.wav	1	0	1	87	307654	52-49-46-46	embedded	.wav
+122	SFX_MiniSunsetHill	Regular	.mp3	SFX_MiniSunsetHill.ogg	1	0	1	87	409511	4F-67-67-53	external	.ogg
+123	SFX_CodeGot	IsEmbedded, Regular	.wav	SFX_CodeGot.wav	1	0	1	88	357670	52-49-46-46	embedded	.wav
+124	SFX_FallDown	IsEmbedded, Regular	.wav	SFX_FallDown.wav	1	0	1	89	226680	52-49-46-46	embedded	.wav
+125	SFX_SilverDrilling	IsEmbedded, Regular	.wav	SFX_SilverDrilling.wav	1	0	1	90	64562	52-49-46-46	embedded	.wav
+126	SFX_Wall_Fall2	IsEmbedded, Regular	.wav	SFX_Wall_Fall2.wav	1	0	1	91	319074	52-49-46-46	embedded	.wav
+127	SFX_EggBoss1	Regular	.mp3	SFX_EggBoss1.ogg	1	0	1	91	1047179	4F-67-67-53	external	.ogg
+128	SFX_SpeedBooster	IsEmbedded, Regular	.wav	SFX_SpeedBooster.wav	1	0	1	92	59412	52-49-46-46	embedded	.wav
+129	SFX_StarPoint	IsEmbedded, Regular	.wav	SFX_StarPoint.wav	1	0	1	93	80988	52-49-46-46	embedded	.wav
+130	SFX_WaterSplash	IsEmbedded, Regular	.wav	SFX_WaterSplash.wav	1	0	1	94	169144	52-49-46-46	embedded	.wav
+131	SFX_Drowning	IsEmbedded, Regular	.wav	SFX_Drowning.wav	1	0	1	95	1078692	52-49-46-46	embedded	.wav
+132	SFX_Drowned	IsEmbedded, Regular	.wav	SFX_Drowned.wav	1	0	1	96	146936	52-49-46-46	embedded	.wav
+133	SFX_Inhale	IsEmbedded, Regular	.wav	SFX_Inhale.wav	1	0	1	97	30694	52-49-46-46	embedded	.wav
+134	SFX_Exploy	IsEmbedded, Regular	.wav	SFX_Exploy.wav	1	0	1	98	43402	52-49-46-46	embedded	.wav
+135	SFX_BorderWarp	IsEmbedded, Regular	.wav	SFX_BorderWarp.wav	1	0	1	99	167458	52-49-46-46	embedded	.wav
+136	SFX_RoarScreamer	Regular	.mp3	SFX_RoarScreamer.ogg	1	0	1	99	30611	4F-67-67-53	external	.ogg
+137	SFX_YTF_Eng	Regular	.mp3	SFX_YTF_Eng.ogg	1	0	1	99	44938	4F-67-67-53	external	.ogg
+138	SFX_YTF_Rus	Regular	.mp3	SFX_YTF_Rus.ogg	1	0	1	99	45671	4F-67-67-53	external	.ogg
+139	SFX_UnContinue	IsEmbedded, Regular	.wav	SFX_UnContinue.wav	1	0	1	100	633114	52-49-46-46	embedded	.wav
+140	SFX_SSW	IsEmbedded, Regular	.wav	SFX_SSW.wav	1	0	1	101	379270	52-49-46-46	embedded	.wav
+141	SFX_SC	IsEmbedded, Regular	.wav	SFX_SC.wav	1	0	1	102	379114	52-49-46-46	embedded	.wav

@@ -1,0 +1,10 @@
+sprites=770
+backgrounds=69
+sounds=142
+fonts=5
+paths=2
+exported_masks=814
+exported_bg_images=69
+exported_sounds=142
+exported_fonts=5
+errors=0
