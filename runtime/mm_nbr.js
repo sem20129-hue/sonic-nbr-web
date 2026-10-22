@@ -567,15 +567,52 @@
   /*  GMS 1.4 builtins                                                      */
   /* ===================================================================== */
 
+  // GML 1.4: audio_play_sound(index, priority, loop) -- loop is the 3rd arg.
   B.audio_play_sound = function (ctx, args) {
     var f = resolveSound(args[0]);
     if (!f) return 0;
+    var loop = args.length >= 3 ? num(args[2], 0) !== 0 : num(args[1], 0) !== 0;
     MM.audio.playFile(f.name, f.src, {
-      loop: num(args[1], 0) !== 0,
+      loop: loop,
       volume: num(f.volume, 1),
       pitch: f.pitch ? Math.pow(2, f.pitch / 12) : 1
     });
     return 0;
+  };
+
+  // Legacy GML 1.4 sound_* builtins go through the file player as well.
+  B.sound_play = function (ctx, args) {
+    var f = resolveSound(args[0]);
+    if (!f) return 0;
+    MM.audio.playFile(f.name, f.src, {
+      loop: false,
+      volume: num(f.volume, 1),
+      pitch: f.pitch ? Math.pow(2, f.pitch / 12) : 1
+    });
+    return 0;
+  };
+
+  B.sound_loop = function (ctx, args) {
+    var f = resolveSound(args[0]);
+    if (!f) return 0;
+    MM.audio.stopFile(f.name);   // restart rather than stack copies
+    MM.audio.playFile(f.name, f.src, {
+      loop: true,
+      volume: num(f.volume, 1),
+      pitch: f.pitch ? Math.pow(2, f.pitch / 12) : 1
+    });
+    return 0;
+  };
+
+  B.sound_stop = function (ctx, args) {
+    var f = resolveSound(args[0]);
+    if (f) MM.audio.stopFile(f.name);
+    return 0;
+  };
+
+  B.sound_is_playing = function (ctx, args) {
+    var f = resolveSound(args[0]);
+    return !!(f && MM.audio.isFilePlaying(f.name));
   };
 
   B.audio_stop_sound = function (ctx, args) {
@@ -621,6 +658,7 @@
   B.audio_is_playing = function (ctx, args) {
     var f = resolveSound(args[0]);
     if (!f) return false;
+    if (MM.audio.isMusicFilePlaying && MM.audio.isMusicFilePlaying(f.name)) return true;
     return MM.audio.isFilePlaying(f.name) ? true : false;
   };
 
@@ -1030,6 +1068,21 @@
     };
     setTimeout(pump, delay == null ? 1200 : delay);
   };
+
+
+  // Sounds warmed up right after the audio unlock: the ones the GML calls
+  // most often (rings, jumps, hits, alarms, familiar music stings).
+  MM.PRELOAD_SOUNDS = [
+    'SFX_Ring', 'SFX_Jump', 'SFX_Rolling', 'SFX_Spindash', 'SFX_Spring',
+    'SFX_Hit', 'SFX_LoseRings', 'SFX_TrapRing', 'SFX_DataMove', 'SFX_Alert',
+    'SFX_Warp', 'SFX_Laugh', 'SFX_GS', 'SFX_ExeHit', 'SFX_BotHit',
+    'SFX_BoxBroke', 'SFX_Broke', 'SFX_BlowsUp', 'SFX_Grab', 'SFX_EnergoChin',
+    'SFX_BorderWarp', 'SFX_SuperTrapRing', 'SFX_Elevator', 'SFX_GCU',
+    'SFX_MSonic_Pulse', 'SFX_MiniSunsetHill', 'SFX_YCR_Piano3', 'SFX_Continue',
+    'SFX_Locked', 'SFX_TTP', 'SFX_DataSelect', 'SFX_SEGA', 'SFX_TitleScreen',
+    'SFX_GreenHill', 'SFX_Hill', 'SFX_Forest', 'SFX_HS1', 'SFX_Chase1',
+    'SFX_Cont', 'SFX_GU'
+  ];
 
   MM.nbrBoot = function (opts) {
     opts = opts || {};

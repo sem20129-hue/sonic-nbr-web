@@ -106,6 +106,13 @@
       musicFade.connect(master);
 
       resumeCtx(); // mobile: context often starts suspended
+      // A room may have asked for music before the first user gesture; now
+      // that we have a context, honour that request.
+      if (fileMusic && fileMusic.src && fileMusic.name && !fileMusic.node) {
+        if (fileBuffers[fileMusic.src]) startFileMusic();
+        else loadFileBuffer(fileMusic.src);
+      }
+      preloadCommon();
       return true;
     } catch (e) {
       ctx = null; master = null; sfxBus = null; musicVol = null; musicFade = null;
@@ -545,8 +552,17 @@
       g.gain.value = clamp01(opts.volume === undefined ? 1 : opts.volume);
       node.connect(g);
       g.connect(opts.music ? musicVol : sfxBus);
+      var rec = { s: node };
+      var list = liveFiles[name] || (liveFiles[name] = []);
+      list.push(rec);
+      node.onended = function () {
+        var l = liveFiles[name];
+        if (!l) return;
+        var at = l.indexOf(rec);
+        if (at >= 0) l.splice(at, 1);
+        if (!l.length) delete liveFiles[name];
+      };
       node.start(0);
-      liveFiles[name] = [{ s: node }];
       return true;
     } catch (e) { return false; }
   }
@@ -595,13 +611,17 @@
     fileMusic.name = name;
     fileMusic.src = src;
     fileMusic.wantLoop = opts.loop !== false;
+    if (!isReady()) init();          // allowed: the context starts suspended
     resumeCtx();
+    if (!isReady()) return false;    // truly headless (no AudioContext)
     if (!fileBuffers[src]) { loadFileBuffer(src); return false; }
     return startFileMusic();
   }
 
   function isFilePlaying(name) { return !!liveFiles[name]; }
-  function isMusicFilePlaying() { return !!(fileMusic.node && fileMusic.name); }
+  function isMusicFilePlaying(name) {
+    return !!(fileMusic.node && fileMusic.name && (!name || fileMusic.name === name));
+  }
 
   /* ------------------------------ volumes ------------------------------ */
 
@@ -637,6 +657,31 @@
   audio.stopFile = stopFile;
   audio.stopAllFiles = stopAllFiles;
   audio.setFileVolume = setFileVolume;
+
+  // ---- background warm-up of the most used sound effects ---------------
+  var preloadStarted = false;
+
+  function preloadCommon() {
+    if (preloadStarted || typeof setTimeout !== 'function') return;
+    preloadStarted = true;
+    var list = MM.PRELOAD_SOUNDS || [];
+    var i = 0;
+    var pump = function () {
+      if (i >= list.length) return;
+      var f = MM.soundFiles && MM.soundFiles[list[i++]];
+      if (f && f.src) loadFileBuffer(f.src);
+      setTimeout(pump, 140);
+    };
+    setTimeout(pump, 500);
+  }
+  audio.preloadCommon = preloadCommon;
+  audio.preloadNames = function (names) {
+    for (var i = 0; i < (names || []).length; i++) {
+      var f = MM.soundFiles && MM.soundFiles[names[i]];
+      if (f && f.src) loadFileBuffer(f.src);
+    }
+  };
+
   audio.playMusicFile = playMusicFile;
   audio.stopMusicFile = stopFileMusic;
   audio.isFilePlaying = isFilePlaying;
