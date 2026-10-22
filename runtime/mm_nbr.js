@@ -646,12 +646,17 @@
 
   B.audio_sound_gain = function (ctx, args) {
     var f = resolveSound(args[0]);
-    if (f) MM.audio.setFileVolume(f.name, num(args[1], 1));
+    if (f) MM.audio.setFileVolume(f.name, num(args[1], 1), num(args[2], 0));
     return 0;
   };
 
   B.audio_music_gain = function (ctx, args) {
-    MM.audio.setMusicVolume(num(args[0], 1));
+    MM.audio.setMusicVolume(num(args[0], 1), num(args[1], 0));
+    return 0;
+  };
+
+  B.audio_master_gain = function (ctx, args) {
+    MM.audio.setMusicVolume(num(args[0], 1), num(args[1], 0));
     return 0;
   };
 
@@ -662,12 +667,8 @@
     return MM.audio.isFilePlaying(f.name) ? true : false;
   };
 
-  B.audio_pause_music = function (ctx, args) { MM.audio.stopMusicFile(); return 0; };
-  B.audio_resume_music = function (ctx, args) {
-    var cur = MM.audio && MM.audio.musicName ? MM.audio.musicName() : null;
-    if (cur) MM.audio.playMusicFile(cur.name, cur.src, { loop: true });
-    return 0;
-  };
+  B.audio_pause_music = function (ctx, args) { MM.audio.pauseMusicFile(); return 0; };
+  B.audio_resume_music = function (ctx, args) { MM.audio.resumeMusicFile(); return 0; };
   B.audio_pause_sound = function (ctx, args) {
     var f = resolveSound(args[0]);
     if (f) MM.audio.stopFile(f.name);
@@ -678,8 +679,8 @@
     if (f) MM.audio.playFile(f.name, f.src, { loop: f.loop, volume: f.volume });
     return 0;
   };
-  B.audio_pause_all = function (ctx, args) { MM.audio.stopAllFiles(); return 0; };
-  B.audio_resume_all = function (ctx, args) { return 0; };
+  B.audio_pause_all = function (ctx, args) { MM.audio.pauseAllFiles(); return 0; };
+  B.audio_resume_all = function (ctx, args) { MM.audio.resumeMusicFile(); return 0; };
   B.sound_global_volume = function (ctx, args) {
     MM.audio.setSfxVolume(num(args[0], 1));
     MM.audio.setMusicVolume(num(args[0], 1));

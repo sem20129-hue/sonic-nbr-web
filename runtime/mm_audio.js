@@ -504,7 +504,8 @@
   var fileBuffers = {};   // url -> AudioBuffer
   var fileLoading = {};   // url -> true
   var liveFiles = {};     // name -> [{ s: node }]
-  var fileMusic = { name: null, src: null, node: null, gain: null, wantLoop: true };
+  var fileMusic = { name: null, src: null, node: null, gain: null, wantLoop: true,
+                    startAt: 0, offset: 0, paused: false };
 
   function loadFileBuffer(url) {
     if (!url) return null;
@@ -552,25 +553,48 @@
       g.gain.value = clamp01(opts.volume === undefined ? 1 : opts.volume);
       node.connect(g);
       g.connect(opts.music ? musicVol : sfxBus);
-      var rec = { s: node };
+      var rec = { s: node, g: g };
       var list = liveFiles[name] || (liveFiles[name] = []);
       list.push(rec);
+      var gl = fileGains[name] || (fileGains[name] = []);
+      gl.push(g);
       node.onended = function () {
         var l = liveFiles[name];
-        if (!l) return;
-        var at = l.indexOf(rec);
-        if (at >= 0) l.splice(at, 1);
-        if (!l.length) delete liveFiles[name];
+        if (l) {
+          var at = l.indexOf(rec);
+          if (at >= 0) l.splice(at, 1);
+          if (!l.length) delete liveFiles[name];
+        }
+        var gg = fileGains[name];
+        if (gg) {
+          var gt = gg.indexOf(g);
+          if (gt >= 0) gg.splice(gt, 1);
+          if (!gg.length) delete fileGains[name];
+        }
       };
       node.start(0);
       return true;
     } catch (e) { return false; }
   }
 
-  function setFileVolume(name, v) {
-    // volume is baked into the gain node; emulate with a per-name gain map
-    var g = fileGains[name];
-    if (g) { try { g.gain.setTargetAtTime(clamp01(v), ctx.currentTime, 0.02); } catch (e) {} }
+  function setFileVolume(name, v, ms) {
+    var list = fileGains[name];
+    if (!list || !list.length) return;
+    var target = clamp01(v);
+    var now = ctx.currentTime;
+    var ramp = Math.max(0, num(ms, 0)) / 1000;
+    for (var i = 0; i < list.length; i++) {
+      var g = list[i];
+      try {
+        if (ramp > 0) {
+          g.gain.cancelScheduledValues(now);
+          g.gain.setValueAtTime(g.gain.value, now);
+          g.gain.linearRampToValueAtTime(target, now + ramp);
+        } else {
+          g.gain.setValueAtTime(target, now);
+        }
+      } catch (e) { /* ignore */ }
+    }
   }
 
   var fileGains = {};
@@ -580,6 +604,30 @@
     if (fileMusic.gain) { try { fileMusic.gain.disconnect(); } catch (e) {} }
     fileMusic.node = null; fileMusic.gain = null;
     fileMusic.name = null; fileMusic.src = null;
+    fileMusic.offset = 0; fileMusic.startAt = 0; fileMusic.paused = false;
+  }
+
+  // Pause keeps the track (and the position) so resume can pick it up again.
+  function pauseFileMusic() {
+    if (fileMusic.node) {
+      var elapsed = Math.max(0, ctx.currentTime - fileMusic.startAt);
+      fileMusic.offset = (fileMusic.offset + elapsed) % 1e9;
+      try { fileMusic.node.stop(0); } catch (e) {}
+      if (fileMusic.gain) { try { fileMusic.gain.disconnect(); } catch (e) {} }
+      fileMusic.node = null; fileMusic.gain = null;
+      fileMusic.paused = true;
+    }
+    return true;
+  }
+
+  function resumeFileMusic() {
+    if (!fileMusic.name) return false;
+    if (fileMusic.node) return true;
+    if (!isReady()) init();
+    if (!isReady()) return false;
+    if (!fileBuffers[fileMusic.src]) { loadFileBuffer(fileMusic.src); return false; }
+    fileMusic.paused = false;
+    return startFileMusic();
   }
 
   function startFileMusic() {
@@ -593,12 +641,16 @@
       g.gain.value = 0;
       node.connect(g);
       g.connect(musicVol);
-      node.start(0);
+      var from = fileMusic.offset || 0;
+      if (buf.duration && from >= buf.duration) from = 0;
+      node.start(0, from);
       var now = ctx.currentTime;
       g.gain.setValueAtTime(0, now);
       g.gain.linearRampToValueAtTime(1, now + 0.4);
       fileMusic.node = node;
       fileMusic.gain = g;
+      fileMusic.startAt = now;
+      fileMusic.paused = false;
       return true;
     } catch (e) { return false; }
   }
@@ -606,6 +658,11 @@
   function playMusicFile(name, src, opts) {
     opts = opts || {};
     if (fileMusic.name === name && fileMusic.node) return true;
+    if (fileMusic.name === name && fileMusic.paused) {
+      // same track, was paused: continue where it left off
+      fileMusic.wantLoop = opts.loop !== false;
+      return resumeFileMusic();
+    }
     stopFileMusic();
     if (!src) return false;
     fileMusic.name = name;
@@ -633,12 +690,20 @@
     }
   }
 
-  function setMusicVolume(v) {
+  function setMusicVolume(v, ms) {
     musicVolume = clamp01(v);
-    if (musicVol) {
-      try { musicVol.gain.setTargetAtTime(musicVolume, ctx.currentTime, 0.02); }
-      catch (e) { musicVol.gain.value = musicVolume; }
-    }
+    if (!musicVol) return;
+    var now = ctx.currentTime;
+    var ramp = Math.max(0, num(ms, 0)) / 1000;
+    try {
+      if (ramp > 0) {
+        musicVol.gain.cancelScheduledValues(now);
+        musicVol.gain.setValueAtTime(musicVol.gain.value, now);
+        musicVol.gain.linearRampToValueAtTime(musicVolume, now + ramp);
+      } else {
+        musicVol.gain.setValueAtTime(musicVolume, now);
+      }
+    } catch (e) { musicVol.gain.value = musicVolume; }
   }
 
   /* --------------------------- public interface ------------------------ */
@@ -684,6 +749,12 @@
 
   audio.playMusicFile = playMusicFile;
   audio.stopMusicFile = stopFileMusic;
+  audio.pauseMusicFile = pauseFileMusic;
+  audio.resumeMusicFile = resumeFileMusic;
+  audio.pauseAllFiles = function () {
+    pauseFileMusic();
+    stopAllFiles();
+  };
   audio.isFilePlaying = isFilePlaying;
   audio.isMusicFilePlaying = isMusicFilePlaying;
   audio.fileBuffers = fileBuffers;
