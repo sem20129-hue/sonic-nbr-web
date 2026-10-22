@@ -106,22 +106,22 @@
 </script>
 
 <!-- runtime -->
-<script src="runtime/mm_core.js"></script>
-<script src="runtime/mm_interp.js"></script>
-<script src="runtime/mm_builtins.js"></script>
-<script src="runtime/mm_audio.js"></script>
-<script src="runtime/mm_nbr.js"></script>
-<script src="runtime/mm_fanending.js"></script>
+<script src="runtime/mm_core.js?v=202610222234"></script>
+<script src="runtime/mm_interp.js?v=202610222234"></script>
+<script src="runtime/mm_builtins.js?v=202610222234"></script>
+<script src="runtime/mm_audio.js?v=202610222234"></script>
+<script src="runtime/mm_nbr.js?v=202610222234"></script>
+<script src="runtime/mm_fanending.js?v=202610222234"></script>
 
 <!-- generated game package -->
-<script src="game/code.js"></script>
-<script src="game/sprites.js"></script>
-<script src="game/objects.js"></script>
-<script src="game/rooms.js"></script>
-<script src="game/scripts.js"></script>
-<script src="game/sounds.js"></script>
-<script src="game/fonts.js"></script>
-<script src="game/assets.js"></script>
+<script src="game/code.js?v=202610222234"></script>
+<script src="game/sprites.js?v=202610222234"></script>
+<script src="game/objects.js?v=202610222234"></script>
+<script src="game/rooms.js?v=202610222234"></script>
+<script src="game/scripts.js?v=202610222234"></script>
+<script src="game/sounds.js?v=202610222234"></script>
+<script src="game/fonts.js?v=202610222234"></script>
+<script src="game/assets.js?v=202610222234"></script>
 
 <script>
 (function () {
@@ -178,6 +178,20 @@
   window.addEventListener('keydown', function (e) {
     if (!overlay.classList.contains('hidden')) start();
   }, { once: false });
+
+  // Any later gesture also retries the unlock: some mobile browsers ignore
+  // the very first event, and contexts get suspended when the tab is hidden.
+  function reUnlock() {
+    if (MM.audio && MM.audio.unlock) MM.audio.unlock();
+  }
+  window.addEventListener('pointerdown', reUnlock, true);
+  window.addEventListener('touchstart', reUnlock, true);
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) return;
+    if (!MM.audio) return;
+    if (MM.audio.resumeMusicFile) MM.audio.resumeMusicFile();
+    reUnlock();
+  });
 
   window.NBR_DIAG = function () {
     return { summary: MM.debug ? MM.debug.summary() : null, warnings: MM.warnings.slice(0, 40) };
