@@ -125,22 +125,22 @@
 </script>
 
 <!-- runtime -->
-<script src="runtime/mm_core.js?v=202610230948"></script>
-<script src="runtime/mm_interp.js?v=202610230948"></script>
-<script src="runtime/mm_builtins.js?v=202610230948"></script>
-<script src="runtime/mm_audio.js?v=202610230948"></script>
-<script src="runtime/mm_nbr.js?v=202610230948"></script>
-<script src="runtime/mm_fanending.js?v=202610230948"></script>
+<script src="runtime/mm_core.js?v=202610230952"></script>
+<script src="runtime/mm_interp.js?v=202610230952"></script>
+<script src="runtime/mm_builtins.js?v=202610230952"></script>
+<script src="runtime/mm_audio.js?v=202610230952"></script>
+<script src="runtime/mm_nbr.js?v=202610230952"></script>
+<script src="runtime/mm_fanending.js?v=202610230952"></script>
 
 <!-- generated game package -->
-<script src="game/code.js?v=202610230948"></script>
-<script src="game/sprites.js?v=202610230948"></script>
-<script src="game/objects.js?v=202610230948"></script>
-<script src="game/rooms.js?v=202610230948"></script>
-<script src="game/scripts.js?v=202610230948"></script>
-<script src="game/sounds.js?v=202610230948"></script>
-<script src="game/fonts.js?v=202610230948"></script>
-<script src="game/assets.js?v=202610230948"></script>
+<script src="game/code.js?v=202610230952"></script>
+<script src="game/sprites.js?v=202610230952"></script>
+<script src="game/objects.js?v=202610230952"></script>
+<script src="game/rooms.js?v=202610230952"></script>
+<script src="game/scripts.js?v=202610230952"></script>
+<script src="game/sounds.js?v=202610230952"></script>
+<script src="game/fonts.js?v=202610230952"></script>
+<script src="game/assets.js?v=202610230952"></script>
 
 <script>
 (function () {
@@ -226,7 +226,14 @@
   setInterval(function () {
     if (!MM.state || !MM.state.room) return;
     var audio = '';
-    if (MM.audio) audio = MM.audio.isReady() ? ' · звук: вкл' : ' · звук: нажми';
+    if (MM.audio) {
+      var st = MM.audio.debugState ? MM.audio.debugState() : null;
+      audio = MM.audio.isReady() ? ' · звук: вкл' : ' · звук: нажми';
+      if (st && st.music) {
+        audio += ' ♪ ' + (st.level || 0).toFixed(2);
+        if (st.element) audio += ' (поток)';
+      }
+    }
     hud.textContent = MM.state.room.name + ' · ' + MM.state.frame + audio;
   }, 250);
 

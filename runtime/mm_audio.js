@@ -66,6 +66,10 @@
   /* ---------------------------- graph state ---------------------------- */
 
   var ctx = null, master = null, sfxBus = null, musicVol = null, musicFade = null;
+  var musicAn = null;          // analyser on the music bus: proves it is audible
+  var musicAnBuf = null;
+  var htmlMusic = null;        // <audio> fallback when Web Audio cannot play
+  var htmlMusicName = null;
   var sfxVolume = 1, musicVolume = 0.8;
   var noiseBuf = null;
   var liveSfx = {}; // name -> [{ s: source, e: endTime }]
@@ -104,6 +108,13 @@
       musicVol.gain.value = musicVolume;
       musicVol.connect(musicFade);
       musicFade.connect(master);
+      try {
+        musicAn = ctx.createAnalyser();
+        musicAn.fftSize = 1024;
+        musicFade.disconnect();
+        musicFade.connect(musicAn);
+        musicAn.connect(master);
+      } catch (e) { musicAn = null; }
 
       resumeCtx(); // mobile: context often starts suspended
       // A room may have asked for music before the first user gesture; now
@@ -511,6 +522,28 @@
   var fileMusic = { name: null, src: null, node: null, gain: null, wantLoop: true,
                     startAt: 0, offset: 0, paused: false };
 
+  // Decoded PCM is what eats memory (~1.4 MB per stereo minute); keep a cap so
+  // a long session cannot grow without bound.  Playing nodes hold their own
+  // reference, so dropping a cache entry never cuts a sound short.
+  var MAX_DECODED_BYTES = 96 * 1024 * 1024;
+  var decodedBytes = 0;
+  var decodedOrder = [];
+
+  function rememberDecoded(url, buf) {
+    var size = (buf.length || 0) * (buf.numberOfChannels || 2) * 4;
+    if (!size || size > MAX_DECODED_BYTES) return;
+    decodedOrder.push({ url: url, size: size });
+    decodedBytes += size;
+    var guard = 0;
+    while (decodedBytes > MAX_DECODED_BYTES && decodedOrder.length > 1 && guard++ < 64) {
+      var rec = decodedOrder.shift();
+      if (rec.url === fileMusic.src && fileMusic.name) { decodedOrder.push(rec); continue; }
+      if (!(rec.url in fileBuffers)) { decodedBytes -= rec.size; continue; }
+      delete fileBuffers[rec.url];
+      decodedBytes -= rec.size;
+    }
+  }
+
   function loadFileBuffer(url) {
     if (!url) return null;
     if (fileBuffers[url]) return fileBuffers[url];
@@ -523,6 +556,7 @@
         .then(function (ab) { fileBytes[url] = ab; return ctx.decodeAudioData(ab); })
         .then(function (buf) {
           fileBuffers[url] = buf;
+          rememberDecoded(url, buf);
           fileLoading[url] = false;
           if (fileMusic.src === url && fileMusic.name && !fileMusic.node) startFileMusic();
         })
@@ -647,7 +681,81 @@
 
   var fileGains = {};
 
+  // ---- <audio> fallback -------------------------------------------------
+  // Web Audio can fail where an element still works: decodeAudioData on a long
+  // wav, a context the browser refuses to resume, a closed device.  If a track
+  // was requested and no source node exists a few seconds later, the same file
+  // goes to an element so the player still hears it.
+  function level() {
+    if (!musicAn) return 0;
+    try {
+      if (!musicAnBuf) musicAnBuf = new Float32Array(musicAn.fftSize);
+      musicAn.getFloatTimeDomainData(musicAnBuf);
+      var sum = 0;
+      for (var i = 0; i < musicAnBuf.length; i++) { var v = musicAnBuf[i]; sum += v * v; }
+      return Math.sqrt(sum / musicAnBuf.length);
+    } catch (e) { return 0; }
+  }
+
+  function htmlMusicPlay() {
+    if (!htmlMusic) return;
+    try {
+      var p = htmlMusic.play();
+      if (p && typeof p.catch === 'function') p.catch(function () {});
+    } catch (e) {}
+  }
+
+  function htmlMusicStop() {
+    if (!htmlMusic) return;
+    try { htmlMusic.pause(); } catch (e) {}
+    try { htmlMusic.removeAttribute('src'); htmlMusic.load(); } catch (e) {}
+    htmlMusic = null;
+    htmlMusicName = null;
+  }
+
+  function musicElement() {
+    var src = fileMusic.src;
+    if (!src || typeof Audio === 'undefined') return false;
+    if (htmlMusic && htmlMusicName === src) { htmlMusicPlay(); return true; }
+    htmlMusicStop();
+    try {
+      var el = new Audio();
+      el.src = src;
+      el.loop = fileMusic.wantLoop !== false;
+      el.preload = 'auto';
+      el.volume = clamp01(musicVolume * MASTER_VOL);
+      el.onerror = function () {
+        if (htmlMusic === el) { htmlMusic = null; htmlMusicName = null; }
+      };
+      htmlMusic = el;
+      htmlMusicName = src;
+      htmlMusicPlay();
+      return true;
+    } catch (e) {
+      htmlMusic = null;
+      htmlMusicName = null;
+      return false;
+    }
+  }
+
+  function musicWatch(name, src, attempt) {
+    if (fileMusic.name !== name || fileMusic.src !== src) return;
+    if (htmlMusic || fileMusic.paused) return;
+    if (fileMusic.node) return;                       // web audio is playing it
+    if (fileLoading[src] || fileBytesLoading[src]) {  // still fetching / decoding
+      if (attempt < 2) setTimeout(function () { musicWatch(name, src, attempt + 1); }, 3000);
+      return;
+    }
+    musicElement();
+  }
+
+  function scheduleMusicWatch(name, src) {
+    if (typeof setTimeout !== 'function') return;
+    setTimeout(function () { musicWatch(name, src, 0); }, 4000);
+  }
+
   function stopFileMusic() {
+    htmlMusicStop();
     if (fileMusic.node) { try { fileMusic.node.stop(0); } catch (e) {} }
     if (fileMusic.gain) { try { fileMusic.gain.disconnect(); } catch (e) {} }
     fileMusic.node = null; fileMusic.gain = null;
@@ -657,6 +765,12 @@
 
   // Pause keeps the track (and the position) so resume can pick it up again.
   function pauseFileMusic() {
+    if (htmlMusic) {
+      fileMusic.offset = htmlMusic.currentTime || fileMusic.offset || 0;
+      try { htmlMusic.pause(); } catch (e) {}
+      fileMusic.paused = true;
+      return true;
+    }
     if (fileMusic.node) {
       var elapsed = Math.max(0, ctx.currentTime - fileMusic.startAt);
       fileMusic.offset = (fileMusic.offset + elapsed) % 1e9;
@@ -670,6 +784,12 @@
 
   function resumeFileMusic() {
     if (!fileMusic.name) return false;
+    if (htmlMusic) {
+      try { htmlMusic.currentTime = fileMusic.offset || 0; } catch (e) {}
+      htmlMusicPlay();
+      fileMusic.paused = false;
+      return true;
+    }
     if (fileMusic.node) return true;
     if (!isReady()) init();
     if (!isReady()) return false;
@@ -679,6 +799,7 @@
   }
 
   function startFileMusic() {
+    if (htmlMusic) return true;        // the element owns playback now
     var buf = fileBuffers[fileMusic.src];
     if (!buf || !isReady()) return false;
     try {
@@ -716,6 +837,7 @@
     fileMusic.name = name;
     fileMusic.src = src;
     fileMusic.wantLoop = opts.loop !== false;
+    scheduleMusicWatch(name, src);
     if (!isReady()) init();          // allowed: the context starts suspended
     resumeCtx();
     if (!isReady()) return false;    // truly headless (no AudioContext)
@@ -725,7 +847,7 @@
 
   function isFilePlaying(name) { return !!liveFiles[name]; }
   function isMusicFilePlaying(name) {
-    return !!(fileMusic.node && fileMusic.name && (!name || fileMusic.name === name));
+    return !!((fileMusic.node || htmlMusic) && fileMusic.name && (!name || fileMusic.name === name));
   }
 
   /* ------------------------------ volumes ------------------------------ */
@@ -740,6 +862,7 @@
 
   function setMusicVolume(v, ms) {
     musicVolume = clamp01(v);
+    if (htmlMusic) { try { htmlMusic.volume = clamp01(musicVolume * MASTER_VOL); } catch (e) {} }
     if (!musicVol) return;
     var now = ctx.currentTime;
     var ramp = Math.max(0, num(ms, 0)) / 1000;
@@ -782,7 +905,9 @@
     var pump = function () {
       if (i >= list.length) return;
       var f = MM.soundFiles && MM.soundFiles[list[i++]];
-      if (f && f.src) loadFileBuffer(f.src);
+      // After MM.preloadAll the bytes are already local: decoding here would
+      // only burn memory up front.  Playback decodes on demand instead.
+      if (f && f.src && !fileBytes[f.src]) loadFileBuffer(f.src);
       setTimeout(pump, 140);
     };
     setTimeout(pump, 500);
@@ -798,6 +923,12 @@
   audio.playMusicFile = playMusicFile;
   audio.stopMusicFile = stopFileMusic;
   audio.prefetchFile = prefetchFile;
+  audio.level = level;
+  audio.usingElement = function () { return !!htmlMusic; };
+  audio.memoryState = function () {
+    return { decodedBytes: decodedBytes, decodedCount: decodedOrder.length,
+             rawBytes: (function () { var b = 0; for (var k in fileBytes) b += fileBytes[k].byteLength || 0; return b; })() };
+  };
   audio.preloadedBytes = function () {
     var n = 0, b = 0;
     for (var k in fileBytes) { n++; b += fileBytes[k].byteLength || 0; }
@@ -829,6 +960,8 @@
       musicNode: !!fileMusic.node,
       musicPaused: !!fileMusic.paused,
       musicOffset: fileMusic.offset ? +fileMusic.offset.toFixed(2) : 0,
+      element: !!htmlMusic,
+      level: +level().toFixed(4),
       lastError: lastFileError
     };
   };
