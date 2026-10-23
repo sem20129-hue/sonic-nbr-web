@@ -351,6 +351,24 @@
       this.vspeed = -s * Math.sin(d * Math.PI / 180);
     }
   });
+  // GML reads `obj.bbox_top` & co. through the member accessor, which looks the
+  // name up on the instance itself.  Without these getters every cross-instance
+  // bbox read silently produced 0 (the Metal Shield ball bounce relied on it).
+  var BBOX_SIDES = [["left", "l"], ["right", "r"], ["top", "t"], ["bottom", "b"]];
+  for (var _bs = 0; _bs < BBOX_SIDES.length; _bs++) {
+    (function (side, key) {
+      Object.defineProperty(Instance.prototype, "bbox_" + side, {
+        get: function () {
+          var b = MM.bbox ? MM.bbox(this) : null;
+          return b ? b[key] : 0;
+        },
+        set: function () { /* read-only in GMS */ },
+        configurable: true,
+        enumerable: false,
+      });
+    })(BBOX_SIDES[_bs][0], BBOX_SIDES[_bs][1]);
+  }
+
   MM.Instance = Instance;
 
   MM.instanceCreate = function (x, y, objRef, vars, deferCreate) {

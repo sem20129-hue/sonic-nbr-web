@@ -504,6 +504,7 @@
   var fileBuffers = {};   // url -> AudioBuffer
   var fileLoading = {};   // url -> true
   var liveFiles = {};     // name -> [{ s: node }]
+  var lastFileError = null;
   var fileMusic = { name: null, src: null, node: null, gain: null, wantLoop: true,
                     startAt: 0, offset: 0, paused: false };
 
@@ -520,7 +521,10 @@
           fileLoading[url] = false;
           if (fileMusic.src === url && fileMusic.name && !fileMusic.node) startFileMusic();
         })
-        .catch(function () { fileLoading[url] = false; });
+        .catch(function (e) {
+          fileLoading[url] = false;
+          lastFileError = url + ': ' + (e && e.message ? e.message : String(e));
+        });
     } catch (e) { fileLoading[url] = false; }
     return null;
   }
@@ -758,6 +762,26 @@
   audio.isFilePlaying = isFilePlaying;
   audio.isMusicFilePlaying = isMusicFilePlaying;
   audio.fileBuffers = fileBuffers;
+
+  // Everything a support report needs, in one object.
+  audio.debugState = function () {
+    var loading = 0, names = [];
+    for (var k in fileLoading) if (fileLoading[k]) { loading++; names.push(k); }
+    return {
+      ctx: ctx ? ctx.state : null,
+      master: MASTER_VOL,
+      musicVolume: musicVolume,
+      buffers: Object.keys(fileBuffers).length,
+      loading: loading,
+      loadingNames: names.slice(0, 5),
+      live: Object.keys(liveFiles).length,
+      music: fileMusic.name,
+      musicNode: !!fileMusic.node,
+      musicPaused: !!fileMusic.paused,
+      musicOffset: fileMusic.offset ? +fileMusic.offset.toFixed(2) : 0,
+      lastError: lastFileError
+    };
+  };
 
   MM.AUDIO_READY = true;
 })(typeof globalThis !== 'undefined' ? globalThis
