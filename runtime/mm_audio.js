@@ -503,6 +503,9 @@
   // actual sample player next to the synthesizer.
   var fileBuffers = {};   // url -> AudioBuffer
   var fileLoading = {};   // url -> true
+  var fileBytes = {};     // url -> ArrayBuffer (prefetched, not decoded yet)
+  var fileBytesLoading = {};
+  var fileBytesWaiters = {};
   var liveFiles = {};     // name -> [{ s: node }]
   var lastFileError = null;
   var fileMusic = { name: null, src: null, node: null, gain: null, wantLoop: true,
@@ -514,8 +517,10 @@
     if (fileLoading[url]) return null;
     fileLoading[url] = true;
     try {
-      fetch(url).then(function (r) { return r.arrayBuffer(); })
-        .then(function (ab) { return ctx.decodeAudioData(ab); })
+      var ready = fileBytes[url] ? Promise.resolve(fileBytes[url])
+                                 : fetch(url).then(function (r) { return r.arrayBuffer(); });
+      ready
+        .then(function (ab) { fileBytes[url] = ab; return ctx.decodeAudioData(ab); })
         .then(function (buf) {
           fileBuffers[url] = buf;
           fileLoading[url] = false;
@@ -527,6 +532,45 @@
         });
     } catch (e) { fileLoading[url] = false; }
     return null;
+  }
+
+  function flushBytes(url, ok) {
+    var list = fileBytesWaiters[url] || [];
+    fileBytesWaiters[url] = [];
+    for (var i = 0; i < list.length; i++) { try { list[i](ok); } catch (e) {} }
+  }
+
+  // Fetch the compressed bytes without decoding them.  The first real playback
+  // then only pays for decodeAudioData(), not for a network round-trip.
+  function prefetchFile(url, cb) {
+    if (!url) { if (cb) cb(false); return; }
+    if (fileBytes[url] || fileBuffers[url]) { if (cb) cb(true); return; }
+    if (fileBytesLoading[url]) {
+      (fileBytesWaiters[url] || (fileBytesWaiters[url] = [])).push(cb);
+      return;
+    }
+    fileBytesLoading[url] = true;
+    if (cb) (fileBytesWaiters[url] = fileBytesWaiters[url] || []).push(cb);
+    try {
+      fetch(url)
+        .then(function (r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.arrayBuffer();
+        })
+        .then(function (ab) {
+          fileBytes[url] = ab;
+          fileBytesLoading[url] = false;
+          flushBytes(url, true);
+        })
+        .catch(function (e) {
+          fileBytesLoading[url] = false;
+          lastFileError = url + ': ' + (e && e.message ? e.message : String(e));
+          flushBytes(url, false);
+        });
+    } catch (e) {
+      fileBytesLoading[url] = false;
+      flushBytes(url, false);
+    }
   }
 
   function stopFile(name) {
@@ -753,6 +797,12 @@
 
   audio.playMusicFile = playMusicFile;
   audio.stopMusicFile = stopFileMusic;
+  audio.prefetchFile = prefetchFile;
+  audio.preloadedBytes = function () {
+    var n = 0, b = 0;
+    for (var k in fileBytes) { n++; b += fileBytes[k].byteLength || 0; }
+    return { files: n, bytes: b };
+  };
   audio.pauseMusicFile = pauseFileMusic;
   audio.resumeMusicFile = resumeFileMusic;
   audio.pauseAllFiles = function () {

@@ -2,6 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
+<link rel="icon" href="data:,">
 <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
 <title>Sonic.exe: Nightmare Beginning Remake — Unofficial Browser Fan Project</title>
 <style>
@@ -55,6 +56,20 @@
   .dim { color: #6d6d80; font-size: 12px; }
   a { color: #7fb4ff; }
   #bar { font-size: 12px; color: #6d6d80; min-height: 16px; }
+  #pre { margin: 14px 0 2px; }
+  #prebar {
+    height: 6px; background: #1b1b26; border: 1px solid #33334a; border-radius: 3px;
+    overflow: hidden;
+  }
+  #prebar i {
+    display: block; height: 100%; width: 0;
+    background: linear-gradient(90deg, #ff4d4d, #ffe27a);
+    transition: width .15s linear;
+  }
+  #pretext { font-size: 12px; color: #8a8a9e; margin-top: 6px; }
+  #hint { margin-top: 12px; }
+  #hint.wait { color: #55556a; }
+  #hint.ready { color: #ffe27a; font-weight: bold; }
   #hud {
     position: absolute; left: 6px; top: 6px;
     font-size: 11px; color: rgba(255,255,255,.42);
@@ -92,7 +107,11 @@
           <kbd>X</kbd> спуск &nbsp; <kbd>Shift</kbd> бег &nbsp; <kbd>Ctrl</kbd> рывок
         </p>
         <p class="keys"><kbd>F1</kbd> / <kbd>F2</kbd> — неофициальные фан-концовки (в любой момент)</p>
-        <p class="dim">Нажми, чтобы включить звук и начать</p>
+        <div id="pre">
+          <div id="prebar"><i></i></div>
+          <div id="pretext">Проверка файлов…</div>
+        </div>
+        <p class="dim" id="hint">Игра загружается целиком, чтобы потом ничего не подвисало</p>
       </div>
     </div>
   </div>
@@ -106,22 +125,22 @@
 </script>
 
 <!-- runtime -->
-<script src="runtime/mm_core.js?v=202610230936"></script>
-<script src="runtime/mm_interp.js?v=202610230936"></script>
-<script src="runtime/mm_builtins.js?v=202610230936"></script>
-<script src="runtime/mm_audio.js?v=202610230936"></script>
-<script src="runtime/mm_nbr.js?v=202610230936"></script>
-<script src="runtime/mm_fanending.js?v=202610230936"></script>
+<script src="runtime/mm_core.js?v=202610230948"></script>
+<script src="runtime/mm_interp.js?v=202610230948"></script>
+<script src="runtime/mm_builtins.js?v=202610230948"></script>
+<script src="runtime/mm_audio.js?v=202610230948"></script>
+<script src="runtime/mm_nbr.js?v=202610230948"></script>
+<script src="runtime/mm_fanending.js?v=202610230948"></script>
 
 <!-- generated game package -->
-<script src="game/code.js?v=202610230936"></script>
-<script src="game/sprites.js?v=202610230936"></script>
-<script src="game/objects.js?v=202610230936"></script>
-<script src="game/rooms.js?v=202610230936"></script>
-<script src="game/scripts.js?v=202610230936"></script>
-<script src="game/sounds.js?v=202610230936"></script>
-<script src="game/fonts.js?v=202610230936"></script>
-<script src="game/assets.js?v=202610230936"></script>
+<script src="game/code.js?v=202610230948"></script>
+<script src="game/sprites.js?v=202610230948"></script>
+<script src="game/objects.js?v=202610230948"></script>
+<script src="game/rooms.js?v=202610230948"></script>
+<script src="game/scripts.js?v=202610230948"></script>
+<script src="game/sounds.js?v=202610230948"></script>
+<script src="game/fonts.js?v=202610230948"></script>
+<script src="game/assets.js?v=202610230948"></script>
 
 <script>
 (function () {
@@ -162,6 +181,47 @@
 
   MM.nbrBoot({ canvas: canvas, room: 'LanguageSelect_19', width: 640, height: 480, fps: 60 });
 
+  // --- full preload ----------------------------------------------------
+  // Every sprite frame, mask, background and the bytes of every sound is
+  // fetched before the player gets control, so later rooms never hitch.
+  // The world stays paused meanwhile: loading must not cost frames.
+  var prebar = document.querySelector('#prebar i');
+  var pretext = document.getElementById('pretext');
+  var hint = document.getElementById('hint');
+  var ready = false;
+  if (MM.state) MM.state.paused = true;
+
+  function mb(n) { return (n / 1048576).toFixed(1) + ' МБ'; }
+
+  MM.preloadAll({
+    concurrency: 8,
+    onProgress: function (p) {
+      if (!p.total) return;
+      var pct = Math.floor(p.done * 100 / p.total);
+      prebar.style.width = pct + '%';
+      var bytes = (MM.audio && MM.audio.preloadedBytes) ? MM.audio.preloadedBytes() : null;
+      pretext.textContent = 'Загрузка ' + p.done + ' / ' + p.total + ' · ' + pct + '%' +
+        (bytes && bytes.bytes ? ' · звук ' + mb(bytes.bytes) : '') +
+        (p.failed ? ' · не удалось: ' + p.failed : '');
+    },
+    onDone: function (r) {
+      ready = true;
+      prebar.style.width = '100%';
+      pretext.textContent = 'Всё загружено' + (r && r.failed ? ' (кроме ' + r.failed + ' файлов)' : '');
+      hint.className = 'ready';
+      hint.textContent = 'Нажми, чтобы включить звук и начать';
+    }
+  });
+
+  // Safety valve: a dead asset must not lock the player out forever.
+  setTimeout(function () {
+    if (ready) return;
+    hint.className = 'wait';
+    hint.textContent = 'Долго? Нажми, чтобы начать не дожидаясь полной загрузки';
+    hint.style.cursor = 'pointer';
+    hint.addEventListener('click', function (e) { e.stopPropagation(); ready = true; start(); });
+  }, 45000);
+
   // --- hud -------------------------------------------------------------
   setInterval(function () {
     if (!MM.state || !MM.state.room) return;
@@ -172,8 +232,10 @@
 
   // --- audio unlock + start --------------------------------------------
   function start() {
+    if (!ready) return;
     overlay.classList.add('hidden');
     if (MM.audio && MM.audio.unlock) MM.audio.unlock();
+    if (MM.state) MM.state.paused = false;
     canvas.focus();
   }
   overlay.addEventListener('click', start);

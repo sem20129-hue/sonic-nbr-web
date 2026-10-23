@@ -136,11 +136,19 @@
   var maskCache = {};   // src -> { w, h, data }
 
   var maskLoading = Object.create(null);
+  var maskWaiters = Object.create(null);
 
-  function maskData(src) {
-    if (!src) return null;
-    if (maskCache[src]) return maskCache[src];
-    if (!hasImage || !hasCanvas) return null;
+  function flushMask(src) {
+    var list = maskWaiters[src] || [];
+    maskWaiters[src] = [];
+    for (var i = 0; i < list.length; i++) { try { list[i](!!maskCache[src]); } catch (e) {} }
+  }
+
+  function maskData(src, cb) {
+    if (!src) { if (cb) cb(false); return null; }
+    if (maskCache[src]) { if (cb) cb(true); return maskCache[src]; }
+    if (!hasImage || !hasCanvas) { if (cb) cb(false); return null; }
+    if (cb) (maskWaiters[src] = maskWaiters[src] || []).push(cb);
     if (maskLoading[src]) return null;
     maskLoading[src] = true;
     var im = new Image();
@@ -171,8 +179,9 @@
         maskCache[src] = { w: cv.width, h: cv.height, data: d, rows: rows };
       } catch (e) { /* tainted canvas etc. */ }
       maskLoading[src] = false;
+      flushMask(src);
     };
-    im.onerror = function () { maskLoading[src] = false; };
+    im.onerror = function () { maskLoading[src] = false; flushMask(src); };
     im.src = src;
     return null;
   }
@@ -1085,6 +1094,153 @@
     'SFX_Cont', 'SFX_GU'
   ];
 
+
+  /* --------------------------------------------------------------------- */
+  /*  Full preload: everything the game owns, before the first frame        */
+  /* --------------------------------------------------------------------- */
+
+  var preloadQueue = null;    // onDone callbacks while a run is in progress
+  var preloadGuardMs = 30000;
+
+  function collectPreloadJobs() {
+    var jobs = [], seen = Object.create(null), n, d, i, f;
+
+    // 1. every sprite frame
+    for (n in MM.sprites) {
+      d = MM.sprites[n];
+      if (!d || d.kind !== 'image' || !d.frames) continue;
+      for (i = 0; i < d.frames.length; i++) {
+        f = d.frames[i];
+        if (!f || f.img || !f.src || seen['f' + f.src]) continue;
+        seen['f' + f.src] = 1;
+        jobs.push({ kind: 'img', src: f.src, obj: f });
+      }
+    }
+
+    // 2. every pixel mask (heroes and anything with maskKind "mask")
+    for (n in MM.sprites) {
+      d = MM.sprites[n];
+      if (!d || !d.mask || seen['m' + d.mask]) continue;
+      seen['m' + d.mask] = 1;
+      jobs.push({ kind: 'mask', src: d.mask });
+    }
+
+    // 3. backgrounds
+    for (n in MM.bgImages) {
+      var url = MM.bgImages[n];
+      if (!url || seen['b' + url]) continue;
+      seen['b' + url] = 1;
+      jobs.push({ kind: 'bg', src: url });
+    }
+
+    // 4. audio: bytes only, decoded on first play
+    var sounds = MM.soundFiles || {};
+    for (n in sounds) {
+      var def = sounds[n];
+      if (!def || !def.src || seen['s' + def.src]) continue;
+      seen['s' + def.src] = 1;
+      jobs.push({ kind: 'snd', src: def.src });
+    }
+
+    return jobs;
+  }
+
+  MM.preloadAll = function (opts) {
+    opts = opts || {};
+    var onProgress = opts.onProgress || function () {};
+    var onDone = opts.onDone || function () {};
+
+    if (MM.preloadedAll) { onDone({ skipped: true }); return; }
+    if (preloadQueue) { preloadQueue.push(onDone); return; }
+    preloadQueue = [onDone];
+    MM.preloadAllUsed = true;
+
+    if (!hasImage) {           // node / headless: nothing to fetch
+      MM.preloadedAll = true;
+      var q0 = preloadQueue; preloadQueue = null;
+      for (var z = 0; z < q0.length; z++) q0[z]({ skipped: true });
+      return;
+    }
+
+    var jobs = collectPreloadJobs();
+    var total = jobs.length;
+    var width = Math.max(1, Math.min(8, opts.concurrency || 8));
+    var next = 0, done = 0, failed = 0, finishedFlag = false;
+
+    MM.preloadStats = { done: 0, total: total, failed: 0, finished: false };
+    onProgress({ done: 0, total: total, failed: 0 });
+
+    function finish() {
+      if (finishedFlag) return;
+      finishedFlag = true;
+      MM.preloadedAll = true;
+      MM.preloadStats.finished = true;
+      var list = preloadQueue || [];
+      preloadQueue = null;
+      onProgress({ done: total, total: total, failed: failed, finished: true });
+      for (var i = 0; i < list.length; i++) { try { list[i]({ total: total, failed: failed }); } catch (e) {} }
+    }
+
+    function tick(ok) {
+      done++;
+      if (!ok) failed++;
+      MM.preloadStats.done = done;
+      MM.preloadStats.failed = failed;
+      if ((done & 7) === 0 || done >= total) {
+        onProgress({ done: done, total: total, failed: failed });
+      }
+      if (done >= total) finish();
+    }
+
+    function run(job, doneCb) {
+      var settled = false;
+      var guard = null;
+      var once = function (ok) {
+        if (settled) return;
+        settled = true;
+        if (guard && typeof clearTimeout === 'function') clearTimeout(guard);
+        doneCb(ok);
+      };
+      if (typeof setTimeout === 'function') {
+        guard = setTimeout(function () { once(false); }, preloadGuardMs);
+      }
+      try {
+        if (job.kind === 'img') {
+          ensureFrame(job.obj, function () { once(!!job.obj.img); });
+        } else if (job.kind === 'mask') {
+          maskData(job.src, function (ok) { once(ok); });
+        } else if (job.kind === 'bg') {
+          var im = MM.bgImage(job.src);
+          if (!im || im._ready) once(true);
+          else {
+            im.addEventListener('load', function () { once(true); });
+            im.addEventListener('error', function () { once(false); });
+          }
+        } else if (job.kind === 'snd') {
+          if (MM.audio && MM.audio.prefetchFile) MM.audio.prefetchFile(job.src, function (ok) { once(ok); });
+          else once(true);
+        } else {
+          once(true);
+        }
+      } catch (e) { once(false); }
+    }
+
+    function pump() {
+      if (next >= total) return;
+      var job = jobs[next++];
+      run(job, function (ok) {
+        tick(ok);
+        if (done < total) {
+          // let the browser paint between items
+          if (typeof setTimeout === 'function') setTimeout(pump, 0);
+          else pump();
+        }
+      });
+    }
+
+    for (var w = 0; w < width; w++) pump();
+  };
+
   MM.nbrBoot = function (opts) {
     opts = opts || {};
     MM.VIEW_W = opts.width || 640;
@@ -1097,7 +1253,9 @@
       room: opts.room || 'LanguageSelect_19',
       autostart: opts.autostart !== false
     });
-    if (MM.startBackgroundPreload) MM.startBackgroundPreload(1500);
+    // With the full preload running (index.html) the background warmer would
+    // only duplicate work; it stays as a fallback for bare test pages.
+    if (!MM.preloadAllUsed && MM.startBackgroundPreload) MM.startBackgroundPreload(1500);
     return MM;
   };
 
