@@ -1,4 +1,4 @@
-/* mm_nbr.js — GameMaker Studio 1.4 compatibility layer.
+/* mm_nbr.js вЂ” GameMaker Studio 1.4 compatibility layer.
  *
  * Adds to the MiniMaker runtime everything the original
  * "Sonic.exe: Nightmare Beginning Remake" (GMS 1.4) needs:
@@ -37,7 +37,7 @@
   /* ===================================================================== */
 
   MM.spriteImage = function (def) {
-    if (!def || !def.name) { MM.warn('MM.spriteImage: нет имени'); return null; }
+    if (!def || !def.name) { MM.warn('MM.spriteImage: РЅРµС‚ РёРјРµРЅРё'); return null; }
     def.kind = 'image';
     def.w = num(def.w, 1);
     def.h = num(def.h, 1);
@@ -79,6 +79,7 @@
   /* ===================================================================== */
 
   MM.bgImage = function (src) {
+    if (src && typeof src === 'object') src = src.src || null;
     if (!src) return null;
     if (!MM._bgCache) MM._bgCache = {};
     var hit = MM._bgCache[src];
@@ -889,26 +890,55 @@
     return name;
   };
 
+  // Colour-tinted copies are rare (one call site), so cache them by image+colour.
+  var bgTintCache = {};
+
+  function bgTinted(img, col) {
+    try {
+      var key = (img.src || '') + '|' + col;
+      if (bgTintCache[key]) return bgTintCache[key];
+      var cv = document.createElement('canvas');
+      cv.width = img.width;
+      cv.height = img.height;
+      var c2 = cv.getContext('2d');
+      c2.drawImage(img, 0, 0);
+      c2.globalCompositeOperation = 'multiply';
+      var n = col | 0;
+      c2.fillStyle = 'rgb(' + (n & 255) + ',' + ((n >> 8) & 255) + ',' + ((n >> 16) & 255) + ')';
+      c2.fillRect(0, 0, cv.width, cv.height);
+      bgTintCache[key] = cv;
+      return cv;
+    } catch (e) {
+      return img;
+    }
+  }
+
+  // GM signature: draw_background_ext(back, x, y, xscale, yscale, rot, colour, alpha)
   B.draw_background_ext = function (ctx, args) {
     var c = MM.gfxCtx;
     if (!c) return 0;
     var bg = args[0];
     var src = (bg && bg.src) ? bg.src : null;
-    if (!src && typeof bg === 'string') src = (MM.bgImages[bg] && MM.bgImages[bg].src) || null;
+    if (!src && typeof bg === 'string') src = (MM.bgImages && MM.bgImages[bg]) || null;
     var img = MM.bgImage(src);
     if (!img || !img.width) return 0;
-    var x = num(args[1]), y = num(args[2]), w = num(args[3]), h = num(args[4]);
-    var tx = num(args[5], 0), ty = num(args[6], 0);
-    var sx = num(args[7], 1), sy = num(args[8], 1), alpha = num(args[9], 1);
+    var x = num(args[1]), y = num(args[2]);
+    var sx = num(args[3], 1) || 1, sy = num(args[4], 1) || 1;
+    var rot = num(args[5], 0) * Math.PI / 180;
+    var col = args.length > 6 ? args[6] : -1;
+    var alpha = args.length > 7 ? num(args[7], 1) : 1;
+    var drawn = (col !== -1 && col !== 16777215) ? bgTinted(img, col) : img;
+    var w = img.width * sx, h = img.height * sy;
     var prev = c.globalAlpha;
     c.globalAlpha = Math.max(0, Math.min(1, prev * alpha));
-    var iw = img.width * sx, ih = img.height * sy;
-    var startX = Math.floor((tx - x) / iw), endX = Math.ceil((tx + w - x) / iw);
-    var startY = Math.floor((ty - y) / ih), endY = Math.ceil((ty + h - y) / ih);
-    for (var i = startX; i <= endX; i++) {
-      for (var j = startY; j <= endY; j++) {
-        c.drawImage(img, x + i * iw, y + j * ih, iw, ih);
-      }
+    if (rot) {
+      c.save();
+      c.translate(x + w / 2, y + h / 2);
+      c.rotate(rot);
+      c.drawImage(drawn, -w / 2, -h / 2, w, h);
+      c.restore();
+    } else {
+      c.drawImage(drawn, x, y, w, h);
     }
     c.globalAlpha = prev;
     return 0;
@@ -1128,6 +1158,7 @@
     // 3. backgrounds
     for (n in MM.bgImages) {
       var url = MM.bgImages[n];
+      if (url && url.src) url = url.src;
       if (!url || seen['b' + url]) continue;
       seen['b' + url] = 1;
       jobs.push({ kind: 'bg', src: url });
