@@ -238,15 +238,34 @@
   B.distance_to_point = function (c, a) {
     var me = self(c);
     if (!me) return 100000;
-    var dx = num(a[0]) - me.x, dy = num(a[1]) - me.y;
+    var px = num(a[0]), py = num(a[1]);
+    // GML measures from the instance's bounding box, not from its origin, and
+    // returns 0 while the point is inside the mask.
+    var b = MM.bbox(me);
+    if (!b) {
+      var dx0 = px - me.x, dy0 = py - me.y;
+      return Math.sqrt(dx0 * dx0 + dy0 * dy0);
+    }
+    var dx = px < b.l ? b.l - px : (px > b.r ? px - b.r : 0);
+    var dy = py < b.t ? b.t - py : (py > b.b ? py - b.b : 0);
     return Math.sqrt(dx * dx + dy * dy);
   };
   B.move_towards_point = function (c, a) {
     var me = self(c);
     if (!me) return 0;
     var d = B.point_direction(c, [me.x, me.y, num(a[0]), num(a[1])]);
-    me.direction = d;
-    me.speed = num(a[2]);
+    // GML sets direction+speed, i.e. it rewrites hspeed/vspeed.
+    MM.motionSet(me, d, num(a[2]));
+    return 0;
+  };
+  B.motion_set = function (c, a) {
+    var me = self(c);
+    if (me) MM.motionSet(me, num(a[0]), num(a[1]));
+    return 0;
+  };
+  B.motion_add = function (c, a) {
+    var me = self(c);
+    if (me) MM.motionAdd(me, num(a[0]), num(a[1]));
     return 0;
   };
   function touchesSolid(inst, x, y) {
@@ -257,7 +276,7 @@
       var o = list[i];
       if (o === inst || o._destroyed || !o.solid) continue;
       var ob = MM.bbox(o);
-      if (ob && box.l <= ob.r && box.r >= ob.l && box.t <= ob.b && box.b >= ob.t) return true;
+      if (ob && box.l < ob.r && box.r > ob.l && box.t < ob.b && box.b > ob.t) return true;
     }
     return false;
   }
@@ -269,7 +288,11 @@
     if (!(maxDist > 0)) maxDist = 1000;
     var dx = Math.cos(dir * Math.PI / 180), dy = -Math.sin(dir * Math.PI / 180);
     var steps = 0;
-    // Если инстанс уже залез в солид — выталкиваем его обратно по этой же оси.
+    // GM's move_contact_solid is also the game's "un-sink" tool: when the
+    // instance already overlaps a solid it moves it BACK along -dir until it
+    // is free (Tails/Knuckles call it right after a landing).  Without this the
+    // player stayed a few pixels inside the floor and could not walk; with an
+    // extra pixel it hovered and jittered.
     if (touchesSolid(me, me.x, me.y)) {
       while (steps < maxDist && touchesSolid(me, me.x - dx, me.y - dy)) {
         me.x -= dx; me.y -= dy; steps++;
@@ -277,14 +300,45 @@
       if (steps < maxDist) { me.x -= dx; me.y -= dy; }
       return 0;
     }
-    while (steps < maxDist) {
+    // GameMaker advances in whole pixels and never exceeds maxdist, so
+    // move_contact_solid(direction, 0.1) is a no-op (the game uses it just to
+    // snap against walls); the old loop still moved a full pixel there.
+    while (steps + 1 <= maxDist + 1e-9) {
       if (touchesSolid(me, me.x + dx, me.y + dy)) break;
       me.x += dx; me.y += dy;
       steps++;
     }
     return 0;
   };
-  B.instance_change = function (c, a) { return 0; };
+  B.instance_change = function (c, a) {
+    // GML: instance_change(obj, perf) morphs the instance into another object
+    // in place.  The rings depend on it (Ring -> RingOut, which then plays its
+    // animation and destroys itself) -- as a no-op every collected ring stayed
+    // in the room forever.
+    var me = self(c);
+    if (!me) return 0;
+    var def = MM.resolveObject(a[0]);
+    if (!def) return 0;
+    var perf = a.length > 1 ? (num(a[1]) !== 0) : true;
+    var oldDef = me.object_index;
+    var oldName = me.object_name;
+    me.object_index = def;
+    me.object_name = def.name;
+    me.sprite_index = def.sprite ? MM.resolveSprite(def.sprite) : null;
+    me.mask_index = null;
+    me.visible = def.visible !== false;
+    me.solid = !!def.solid;
+    me.depth = def.depth || 0;
+    me._bboxCache = null;
+    MM.state.version++;
+    if (perf) {
+      var dcode = MM.eventCode(oldDef, 'destroy');
+      if (dcode) MM.interp.run(dcode, { self: me, other: MM.NOONE, name: oldName + ':destroy' });
+      var ccode = MM.eventCode(def, 'create');
+      if (ccode) MM.interp.run(ccode, { self: me, other: MM.NOONE, name: def.name + ':create' });
+    }
+    return 0;
+  };
   B.sprite_get_width = function (c, a) { var s = MM.resolveSprite(a[0]); return s ? s.w : 0; };
   B.sprite_get_height = function (c, a) { var s = MM.resolveSprite(a[0]); return s ? s.h : 0; };
   B.sprite_get_number = function (c, a) { var s = MM.resolveSprite(a[0]); return s ? s.frames.length : 0; };
@@ -579,8 +633,9 @@
   C.c_yellow = 65535;
   C.mb_left = 1; C.mb_right = 2; C.mb_middle = 3;
   C.bm_normal = 0; C.bm_add = 1; C.bm_subtract = 2; C.bm_max = 3;
-  C.fa_left = 0; C.fa_center = 1; C.fa_right = 2;
-  C.fa_top = 0; C.fa_middle = 1; C.fa_bottom = 2;
+  C.fa_left = 0; C.fa_center = 1; C.fa_right = 2;  C.fa_top = 0; C.fa_middle = 1; C.fa_bottom = 2;
+  C.path_action_stop = 0; C.path_action_restart = 1;
+  C.path_action_continue = 2; C.path_action_reverse = 3;
   C.font_small = 0; C.font_med = 1; C.font_big = 2; C.font_huge = 3;
   MM.FONT_SIZES = [8, 10, 16, 24];
 

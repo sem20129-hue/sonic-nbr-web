@@ -687,6 +687,11 @@
       loadFileBuffer(src);
       return false;
     }
+    // Restarting a non-looping sound exactly where it was paused: a real
+    // resume plays the remainder, not the beginning again.
+    var startOffset = 0;
+    if (opts.offset) startOffset = Math.max(0, num(opts.offset, 0));
+    if (!opts.loop && startOffset >= buf.duration) return false;
     stopFile(name);
     try {
       var node = ctx.createBufferSource();
@@ -698,7 +703,7 @@
       g.gain.value = clamp01((opts.volume === undefined ? 1 : opts.volume) * baseGain);
       node.connect(g);
       g.connect(opts.music ? musicVol : sfxBus);
-      var rec = { s: node, g: g };
+      var rec = { s: node, g: g, src: src, opts: opts, startedAt: ctx.currentTime };
       var list = liveFiles[name] || (liveFiles[name] = []);
       list.push(rec);
       var gl = fileGains[name] || (fileGains[name] = []);
@@ -717,7 +722,7 @@
           if (!gg.length) delete fileGains[name];
         }
       };
-      node.start(0);
+      node.start(0, startOffset);
       return true;
     } catch (e) { return false; }
   }
@@ -1012,12 +1017,53 @@
     for (var k in fileBytes) { n++; b += fileBytes[k].byteLength || 0; }
     return { files: n, bytes: b };
   };
+  // ---- pause / resume of *all* file sounds ------------------------------
+  // GML `audio_pause_all` must not destroy anything: looping machinery sounds
+  // (engines, Hum) P.AUSER relies on must come back exactly on resume.  A
+  // stopped buffer-source can't pause in place, so we remember what was live,
+  // where it was, and restart it on resume.  Loops restart at 0, one-shots
+  // continue from their offset (and are dropped if already finished).
+  var pauseResumeList = [];
+
+  function pauseAllFiles() {
+    pauseResumeList = [];
+    for (var name in liveFiles) {
+      var l = liveFiles[name].slice();
+      for (var i = 0; i < l.length; i++) {
+        var rec = l[i];
+        var offset = 0;
+        try { offset = Math.max(0, ctx.currentTime - (rec.startedAt || 0)); } catch (e) {}
+        pauseResumeList.push({ name: name, src: rec.src, opts: rec.opts || {}, offset: offset });
+        try { rec.s.onended = null; rec.s.stop(0); } catch (e) {}
+      }
+      delete liveFiles[name];
+    }
+    // fileGains now point at dead gain nodes: clear, they are rebuilt on play
+    for (var gname in fileGains) delete fileGains[gname];
+    pauseFileMusic();
+  }
+
+  function resumeAllFiles() {
+    var list = pauseResumeList;
+    pauseResumeList = [];
+    for (var i = 0; i < list.length; i++) {
+      var r = list[i];
+      var opts = {};
+      for (var k in r.opts) opts[k] = r.opts[k];
+      if (opts.loop || !r.offset) {
+        delete opts.offset;
+      } else {
+        opts.offset = r.offset; // continue one-shots where they were
+      }
+      try { playFile(r.name, r.src, opts); } catch (e) { /* ignore */ }
+    }
+    resumeFileMusic();
+  }
+
   audio.pauseMusicFile = pauseFileMusic;
   audio.resumeMusicFile = resumeFileMusic;
-  audio.pauseAllFiles = function () {
-    pauseFileMusic();
-    stopAllFiles();
-  };
+  audio.pauseAllFiles = pauseAllFiles;
+  audio.resumeAllFiles = resumeAllFiles;
   audio.isFilePlaying = isFilePlaying;
   audio.isMusicFilePlaying = isMusicFilePlaying;
   audio.fileBuffers = fileBuffers;

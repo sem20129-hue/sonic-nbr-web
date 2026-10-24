@@ -801,7 +801,7 @@
     return 0;
   };
   B.audio_pause_all = function (ctx, args) { MM.audio.pauseAllFiles(); return 0; };
-  B.audio_resume_all = function (ctx, args) { MM.audio.resumeMusicFile(); return 0; };
+  B.audio_resume_all = function (ctx, args) { MM.audio.resumeAllFiles(); return 0; };
   B.sound_global_volume = function (ctx, args) {
     MM.audio.setSfxVolume(num(args[0], 1));
     MM.audio.setMusicVolume(num(args[0], 1));
@@ -907,13 +907,41 @@
     return 0;
   };
 
+  // PAUSER pauses with instance_deactivate_all(true) and resumes with
+  // instance_activate_all().  On pause the ORIGINAL GML then hides the floor
+  // background for the dark pause screen, but the resume never restores it --
+  // after the first pause the floor/backgrounds were gone forever (the
+  // "пола нету" reports).  The runtime snapshots the live background state at
+  // deactivate_all and puts it back at activate_all, so pause is completely
+  // invisible to the game state.
+  var bgPauseSnap = null;
+
+  function bgSnapshot() {
+    var S = MM.bg;
+    if (!S) return null;
+    var keys = ['visible', 'foreground', 'x', 'y', 'hspeed', 'vspeed', 'alpha', 'blend', 'htiled', 'vtiled', 'stretch'];
+    var snap = { slots: BG_SLOTS, room: S.room };
+    for (var k = 0; k < keys.length; k++) snap[keys[k]] = S[keys[k]].slice();
+    return snap;
+  }
+
   B.instance_activate_all = function (ctx, args) {
     var list = MM.state.instances;
     for (var i = 0; i < list.length; i++) list[i]._deactivated = false;
+    if (bgPauseSnap && MM.bg) {
+      var S = MM.bg, snap = bgPauseSnap, n = Math.min(snap.slots, BG_SLOTS);
+      if (S.room === snap.room) {
+        var keys = ['visible', 'foreground', 'x', 'y', 'hspeed', 'vspeed', 'alpha', 'blend', 'htiled', 'vtiled', 'stretch'];
+        for (var i2 = 0; i2 < n; i2++) for (var k2 = 0; k2 < keys.length; k2++) S[keys[k2]][i2] = snap[keys[k2]][i2];
+        S.frame = (MM.state && MM.state.frame) || 0; // do not fast-forward scroll through the pause
+      }
+      bgPauseSnap = null;
+    }
     return 0;
   };
 
   B.instance_deactivate_all = function (ctx, args) {
+    if (MM.bg) bgPauseSnap = bgSnapshot();
     var list = MM.state.instances;
     for (var i = 0; i < list.length; i++) if (!list[i].persistent) list[i]._deactivated = true;
     return 0;
@@ -930,7 +958,7 @@
     if (!self || !p) return 0;
     var path = (typeof p === 'string') ? MM.paths[p] : p;
     if (!path) return 0;
-    self._path = { def: path, index: 0, speed: num(args[1], 1), action: num(args[2], 0), endaction: num(args[3], 0) };
+    self._path = { def: path, pos: 0, dir: 1, speed: num(args[1], 1), action: num(args[2], 0), absolute: num(args[3], 0) !== 0 };
     return 0;
   };
 
@@ -1065,8 +1093,13 @@
   };
 
   B.keyboard_key_press = function (ctx, args) {
+    // GML injects a key press into the input queue for this step.
     var k = num(args[0], 0);
-    return (MM.input.pressed[k] || MM.input.keys[k]) ? true : false;
+    MM.input.keys[k] = true;
+    MM.input.pressed[k] = true;
+    MM.input.anyKeyPressed = true;
+    MM.input.lastKey = k;
+    return 0;
   };
 
   B.action_sprite_color = function (ctx, args) { return 0; };

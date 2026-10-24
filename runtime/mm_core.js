@@ -300,6 +300,26 @@
   MM.resolveObject = function (r) { return resolveRef(r, MM.objects, 'объект'); };
   MM.resolveRoom = function (r) { return resolveRef(r, MM.rooms, 'комната'); };
 
+  // GML resource ids are plain numbers: decompiled code can carry raw ids
+  // (Sonic's draw picks sprp = 0/1/2..., and 117 is a music track), so numeric
+  // references must resolve through the original asset order as well.
+  var _resolveSpriteById = MM.resolveSprite;
+  MM.resolveSprite = function (r) {
+    if (typeof r === 'number') {
+      var sn = (r >= 0 && MM.spriteOrder) ? MM.spriteOrder[Math.floor(r)] : null;
+      return (sn && MM.sprites[sn]) || null;
+    }
+    return _resolveSpriteById(r);
+  };
+  var _resolveObjectById = MM.resolveObject;
+  MM.resolveObject = function (r) {
+    if (typeof r === 'number') {
+      var on = (r >= 0 && MM.objectOrder) ? MM.objectOrder[Math.floor(r)] : null;
+      return (on && MM.objects[on]) || null;
+    }
+    return _resolveObjectById(r);
+  };
+
   function Instance(def, x, y, vars) {
     this.id = MM.state.nextId++;
     this.object_index = def;
@@ -308,6 +328,7 @@
     this.hspeed = 0; this.vspeed = 0;
     this.gravity = 0; this.gravity_direction = 270; this.friction = 0;
     this.sprite_index = resolveRef(def.sprite, MM.sprites, 'спрайт');
+    this.mask_index = null;   // GML: null = use the sprite's own mask
     this.image_index = 0; this.image_speed = 1;
     this.image_angle = 0; this.image_xscale = 1; this.image_yscale = 1;
     this.image_alpha = 1; this.image_blend = '#ffffff';
@@ -495,6 +516,48 @@
     };
   }
 
+  // -------------------------------------------------------------------
+  // GM motion model: hspeed/vspeed are the state; speed/direction are
+  // derived views over them.  Setting either of them rewrites hspeed/vspeed,
+  // exactly like GameMaker.  Without this move_towards_point() changed two
+  // dead properties and nothing in the game ever moved along its direction.
+  MM.motionSpeed = function (inst) {
+    var h = +inst.hspeed || 0, v = +inst.vspeed || 0;
+    return Math.sqrt(h * h + v * v);
+  };
+  MM.motionDirection = function (inst) {
+    var h = +inst.hspeed || 0, v = +inst.vspeed || 0;
+    if (h === 0 && v === 0) return 0;
+    var d = Math.atan2(-v, h) * 180 / Math.PI;
+    return d < 0 ? d + 360 : d;
+  };
+  MM.motionSetSpeed = function (inst, s, dir) {
+    s = +s || 0;
+    if (s === 0) { inst.hspeed = 0; inst.vspeed = 0; return; }
+    var d = (dir === undefined || dir === null)
+      ? (MM.motionSpeed(inst) > 1e-9 ? MM.motionDirection(inst) : 0)
+      : (+dir || 0);
+    var r = d * Math.PI / 180;
+    inst.hspeed = Math.cos(r) * s;
+    inst.vspeed = -Math.sin(r) * s;
+  };
+  MM.motionSetDirection = function (inst, d) {
+    var s = MM.motionSpeed(inst);
+    var r = (+d || 0) * Math.PI / 180;
+    inst.hspeed = Math.cos(r) * s;
+    inst.vspeed = -Math.sin(r) * s;
+  };
+  MM.motionSet = function (inst, dir, s) {
+    var r = (+dir || 0) * Math.PI / 180;
+    inst.hspeed = Math.cos(r) * (+s || 0);
+    inst.vspeed = -Math.sin(r) * (+s || 0);
+  };
+  MM.motionAdd = function (inst, dir, s) {
+    var r = (+dir || 0) * Math.PI / 180;
+    inst.hspeed = (+inst.hspeed || 0) + Math.cos(r) * (+s || 0);
+    inst.vspeed = (+inst.vspeed || 0) - Math.sin(r) * (+s || 0);
+  };
+
   // bbox an instance in world space.
   // Hot path: collision builtins call this hundreds of thousands of times per
   // frame.  Static scenery never moves, so the world bbox is cached on the
@@ -505,14 +568,20 @@
       var bc = inst._bboxCache;
       if (bc && bc.x === inst.x && bc.y === inst.y &&
           bc.sx === inst.image_xscale && bc.sy === inst.image_yscale &&
-          bc.spr === inst.sprite_index) return bc.box;
+          bc.spr === inst.sprite_index && bc.msk === inst.mask_index) return bc.box;
       x = inst.x; y = inst.y;
     } else {
       if (x === undefined) x = inst.x;
       if (y === undefined) y = inst.y;
     }
-    var box = (inst.sprite_index && inst.sprite_index.bbox)
-      ? bboxOfSprite(inst, inst.sprite_index) : null;
+    // GML: the collision mask is mask_index when it points at a sprite; the
+    // game switches it per state (Knuckles stand/duck/punch, ground blocks
+    // solid vs one-way "unsolid" strips).  Ignoring it made every block a full
+    // 256x256 wall and every character wedged and unable to move.
+    var msk = inst.mask_index;
+    var maskSpr = (msk && typeof msk === 'object' && msk.bbox) ? msk : null;
+    var useSpr = maskSpr || inst.sprite_index;
+    var box = (useSpr && useSpr.bbox) ? bboxOfSprite(inst, useSpr) : null;
     if (!box) {
       var m = inst.mask || inst.object_index.mask;
       if (m) {
@@ -522,20 +591,25 @@
       }
     }
     if (!box) {
-      if (own) inst._bboxCache = { x: inst.x, y: inst.y, sx: inst.image_xscale, sy: inst.image_yscale, spr: inst.sprite_index, box: null };
+      if (own) inst._bboxCache = { x: inst.x, y: inst.y, sx: inst.image_xscale, sy: inst.image_yscale, spr: inst.sprite_index, msk: inst.mask_index, box: null };
       return null;
     }
     var out = {
       l: Math.floor(x + box.l), r: Math.floor(x + box.r),
       t: Math.floor(y + box.t), b: Math.floor(y + box.b)
     };
-    if (own) inst._bboxCache = { x: inst.x, y: inst.y, sx: inst.image_xscale, sy: inst.image_yscale, spr: inst.sprite_index, box: out };
+    if (own) inst._bboxCache = { x: inst.x, y: inst.y, sx: inst.image_xscale, sy: inst.image_yscale, spr: inst.sprite_index, msk: inst.mask_index, box: out };
     return out;
   };
 
-  // GMS bbox_right/bbox_bottom — включительно: касание краями считается столкновением.
+  // GML bbox_right/bbox_bottom — включительно: касание краями считается столкновением.
+  // Two masks only collide when they actually share pixels: an instance whose
+  // last row equals the other's first row is *adjacent*, not overlapping.
+  // Inclusive comparison here made the player 1px "inside" the floor after a
+  // landing, and the floor then blocked every horizontal step (the "stops and
+  // can only move after a jump" bug).
   function boxesOverlap(a, b) {
-    return a.l <= b.r && a.r >= b.l && a.t <= b.b && a.b >= b.t;
+    return a.l < b.r && a.r > b.l && a.t < b.b && a.b > b.t;
   }
 
 
@@ -549,7 +623,7 @@
         var o = list[i];
         if (o._destroyed) continue;
         var ob = MM.bbox(o);
-        if (!ob || ob.l > r || ob.r < l || ob.t > b || ob.b < t) continue;
+        if (!ob || ob.l >= r || ob.r <= l || ob.t >= b || ob.b <= t) continue;
         if (cb(o, ob)) return true;
       }
       return false;
@@ -563,8 +637,8 @@
     }
     for (var j = lo; j < es.length; j++) {
       var e = es[j];
-      if (e.l > r) break;
-      if (e.r < l || e.t > b || e.b < t) continue;
+      if (e.l >= r) break;
+      if (e.r <= l || e.t >= b || e.b <= t) continue;
       if (e.o._destroyed) continue;
       if (cb(e.o, e)) return true;
     }
@@ -572,7 +646,7 @@
       var d = rec.dyn[k];
       if (d._destroyed) continue;
       var db = MM.bbox(d);
-      if (!db || db.l > r || db.r < l || db.t > b || db.b < t) continue;
+      if (!db || db.l >= r || db.r <= l || db.t >= b || db.b <= t) continue;
       if (cb(d, db)) return true;
     }
     return false;
@@ -680,11 +754,20 @@
 
   MM.distanceToObject = function (inst, objValue) {
     var best = 1e18;
+    var mine = MM.bbox(inst);
     var list = MM.query(objValue);
     for (var i = 0; i < list.length; i++) {
       var o = list[i];
       if (o === inst) continue;
-      var dx = o.x - inst.x, dy = o.y - inst.y;
+      var ob = MM.bbox(o);
+      var dx, dy;
+      if (!mine || !ob) {
+        dx = o.x - inst.x; dy = o.y - inst.y;
+      } else {
+        // GM: distance between the two bounding boxes, 0 when they touch.
+        dx = mine.r < ob.l ? ob.l - mine.r : (ob.r < mine.l ? mine.l - ob.r : 0);
+        dy = mine.b < ob.t ? ob.t - mine.b : (ob.b < mine.t ? mine.t - ob.b : 0);
+      }
       var d = Math.sqrt(dx * dx + dy * dy);
       if (d < best) best = d;
     }
@@ -724,10 +807,13 @@
         inst.vspeed -= inst.gravity * Math.sin(rad);
       }
       if (inst.friction) {
-        var s = inst.speed;
-        if (s > 0) {
-          s = Math.max(0, s - inst.friction);
-          inst.speed = s;
+        // GM friction reduces speed along the current direction and rewrites
+        // both components (the old code wrote a dead `speed` property).
+        var sp = MM.motionSpeed(inst);
+        if (sp > 0) {
+          var ns = Math.max(0, sp - inst.friction);
+          if (ns <= 0) { inst.hspeed = 0; inst.vspeed = 0; }
+          else { inst.hspeed *= ns / sp; inst.vspeed *= ns / sp; }
         }
       }
       inst.x += inst.hspeed;
@@ -762,13 +848,25 @@
     }
   }
 
+  // An object inherits its parent's collision events: Knuckles has no
+  // collision with Spring_Mask of its own, the one declared on Pers_Obj is
+  // what stops him from walking through springs.  Walk the chain, nearest
+  // definition wins for a given target object.
   MM.defCollisionEvents = function (def) {
     if (def._collisionEvents) return def._collisionEvents;
     var out = [];
-    for (var k in def.events) {
-      if (k.indexOf('collision_') === 0 && typeof def.events[k] === 'string' && def.events[k].length) {
-        out.push({ target: k.slice(10), evName: k, code: MM.resolveCode(def.events[k]) });
+    var seen = Object.create(null);
+    var d = def;
+    while (d) {
+      for (var k in d.events) {
+        if (k.indexOf('collision_') === 0 && typeof d.events[k] === 'string' && d.events[k].length) {
+          var target = k.slice(10);
+          if (seen[target]) continue;
+          seen[target] = true;
+          out.push({ target: target, evName: k, code: MM.resolveCode(d.events[k]) });
+        }
       }
+      d = d.parent ? MM.resolveObject(d.parent) : null;
     }
     def._collisionEvents = out;
     return out;
@@ -799,9 +897,13 @@
       var n = spr.frames.length;
       if (n <= 1 || !inst.image_speed) continue;
       var v = inst.image_index + inst.image_speed;
+      if (!isFinite(v)) { inst.image_index = 0; continue; }
       var wrapped = false;
-      while (v >= n) { v -= n; wrapped = true; }
-      while (v < 0) { v += n; wrapped = true; }
+      if (v >= n || v < 0) {
+        v %= n;
+        if (v < 0) v += n;
+        wrapped = true;
+      }
       inst.image_index = v;
       if (wrapped && MM.eventCode(inst.object_index, 'other_animation_end')) {
         MM.runEvent(inst, 'other_animation_end');
@@ -843,6 +945,10 @@
     }
   }
 
+  // GameMaker view following: the view is centred on the instance's x/y (its
+  // origin -- NOT the bbox centre, which changes with every animation frame
+  // and made the camera twitch), and view_hspeed/vspeed are a maximum number
+  // of pixels per step, not a percentage of the remaining distance.
   function updateCamera() {
     var room = MM.state.room;
     if (!room) return;
@@ -850,49 +956,102 @@
       if (!MM.view.visible[i]) continue;
       var w = MM.view.wview[i], h = MM.view.hview[i];
       var targetObj = MM.view.object[i];
+      var vx = MM.view.xview[i], vy = MM.view.yview[i];
       if (targetObj) {
         var list = MM.query(targetObj);
         if (list.length) {
           var inst = list[0];
-          var cx = inst.x + (MM.bbox(inst) ? (MM.bbox(inst).l + MM.bbox(inst).r) / 2 - inst.x : 0);
-          var cy = inst.y + (MM.bbox(inst) ? (MM.bbox(inst).t + MM.bbox(inst).b) / 2 - inst.y : 0);
-          var tx = cx - w / 2, ty = cy - h / 2;
-          if (MM.view.hspeed[i] < 0 || MM.view.hspeed[i] === undefined) MM.view.xview[i] = tx;
-          else MM.view.xview[i] += (tx - MM.view.xview[i]) * MM.view.hspeed[i] / 100;
-          if (MM.view.vspeed[i] < 0 || MM.view.vspeed[i] === undefined) MM.view.yview[i] = ty;
-          else MM.view.yview[i] += (ty - MM.view.yview[i]) * MM.view.vspeed[i] / 100;
+          var tx = inst.x - w / 2, ty = inst.y - h / 2;
+          var hs = MM.view.hspeed[i], vs = MM.view.vspeed[i];
+          if (hs === undefined || hs < 0) vx = tx;
+          else {
+            var dx2 = tx - vx;
+            if (dx2 > hs) dx2 = hs; else if (dx2 < -hs) dx2 = -hs;
+            vx += dx2;
+          }
+          if (vs === undefined || vs < 0) vy = ty;
+          else {
+            var dy2 = ty - vy;
+            if (dy2 > vs) dy2 = vs; else if (dy2 < -vs) dy2 = -vs;
+            vy += dy2;
+          }
         }
       }
-      MM.view.xview[i] = Math.max(0, Math.min(MM.view.xview[i], Math.max(0, room.w - w)));
-      MM.view.yview[i] = Math.max(0, Math.min(MM.view.yview[i], Math.max(0, room.h - h)));
+      MM.view.xview[i] = Math.max(0, Math.min(vx, Math.max(0, room.w - w)));
+      MM.view.yview[i] = Math.max(0, Math.min(vy, Math.max(0, room.h - h)));
     }
+  }
+
+  // -------------------------------------------------------------------
+  // Paths (GM semantics: path_start(path, speed, endaction, absolute))
+  // -------------------------------------------------------------------
+  function pathMetrics(def) {
+    if (def._metrics) return def._metrics;
+    var pts = def.points || [];
+    var segs = [], total = 0;
+    for (var i = 0; i + 1 < pts.length; i++) {
+      var dx = pts[i + 1].x - pts[i].x, dy = pts[i + 1].y - pts[i].y;
+      var len = Math.sqrt(dx * dx + dy * dy);
+      segs.push(len); total += len;
+    }
+    if (def.closed && pts.length > 1) {
+      var dx2 = pts[0].x - pts[pts.length - 1].x;
+      var dy2 = pts[0].y - pts[pts.length - 1].y;
+      var l2 = Math.sqrt(dx2 * dx2 + dy2 * dy2);
+      segs.push(l2); total += l2;
+    }
+    def._metrics = { segs: segs, total: total, closed: !!def.closed };
+    return def._metrics;
+  }
+
+  function pathPoint(def, info, pos) {
+    var pts = def.points || [];
+    if (!pts.length) return null;
+    if (pos <= 0) return { x: pts[0].x, y: pts[0].y };
+    var count = info.closed ? pts.length : pts.length - 1;
+    for (var i = 0; i < count; i++) {
+      var len = info.segs[i] || 0;
+      if (pos <= len || i === count - 1) {
+        var a = pts[i], b = pts[(i + 1) % pts.length];
+        var t = len > 0 ? Math.max(0, Math.min(1, pos / len)) : 0;
+        return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+      }
+      pos -= len;
+    }
+    var last = pts[pts.length - 1];
+    return { x: last.x, y: last.y };
   }
 
   function tickPaths() {
     var list = MM.state.instances;
+    var fps = MM.FPS || 60;
     for (var i = 0; i < list.length; i++) {
       var inst = list[i];
       if (inst._destroyed || !inst._path) continue;
-      var p = inst._path, def = p.def, pts = def.points || [];
-      if (!pts.length) { inst._path = null; continue; }
-      if (p.index >= pts.length) {
-        inst._path = null;
-        continue;
+      var p = inst._path, def = p.def;
+      var info = pathMetrics(def);
+      if (!info.total) { inst._path = null; continue; }
+      // absolute = pixels/step, relative = percent of the path per second.
+      var stepDist = p.absolute
+        ? p.speed
+        : (p.speed / 100) * info.total / fps;
+      if (!isFinite(stepDist)) stepDist = 0;
+      p.pos = (p.pos || 0) + stepDist * (p.dir || 1);
+      var finished = false;
+      if (p.pos >= info.total) {
+        if (p.action === 1 || p.action === 2) p.pos -= info.total;
+        else if (p.action === 3) { p.pos = info.total - (p.pos - info.total); p.dir = -1; }
+        else { p.pos = info.total; finished = true; }
+      } else if (p.pos < 0) {
+        if (p.action === 1 || p.action === 2) p.pos += info.total;
+        else if (p.action === 3) { p.pos = -p.pos; p.dir = 1; }
+        else { p.pos = 0; finished = true; }
       }
-      var target = pts[p.index];
-      var dx = target.x - inst.x, dy = target.y - inst.y;
-      var d = Math.sqrt(dx * dx + dy * dy);
-      if (d <= p.speed) {
-        inst.x = target.x; inst.y = target.y;
-        p.index++;
-        if (p.index >= pts.length) {
-          inst._path = null;
-          if (MM.eventCode(inst.object_index, 'other_end_of_path')) MM.runEvent(inst, 'other_end_of_path');
-          else if (p.endaction) MM.runEvent(inst, 'other_user_event');
-        }
-      } else {
-        inst.x += dx / d * p.speed;
-        inst.y += dy / d * p.speed;
+      var pt = pathPoint(def, info, p.pos);
+      if (pt) { inst.x = pt.x; inst.y = pt.y; }
+      if (finished) {
+        inst._path = null;
+        if (MM.eventCode(inst.object_index, 'other_end_of_path')) MM.runEvent(inst, 'other_end_of_path');
       }
     }
   }
@@ -1078,7 +1237,7 @@
     for (var i = 0; i < old.length; i++) {
       if (!old[i]._destroyed) MM.runEvent(old[i], 'room_end');
     }
-    MM.state.instances = old.filter(function (x) { return x.persistent && !x._removed; });
+    MM.state.instances = old.filter(function (x) { return x.persistent && !x._removed && !x._destroyed; });
     MM.state.room = room;
     MM.state.pendingRoom = null;
     MM.state.frameInRoom = 0;
@@ -1104,6 +1263,18 @@
       else if (newInst) MM.runEvent(newInst, 'create');
     }
     MM.state.loadingRoom = false;
+
+    // PAUSER is persistent AND placed in most rooms.  GameMaker would stack a
+    // new pause handler on every room transition (three pause screens, three
+    // audio pauses, three "resume" waves) -- keep exactly one.
+    (function dedupePauser() {
+      var found = [];
+      for (var i2 = 0; i2 < MM.state.instances.length; i2++) {
+        var it = MM.state.instances[i2];
+        if (!it._destroyed && it.object_name === 'PAUSER') found.push(it);
+      }
+      for (var j2 = 1; j2 < found.length; j2++) found[j2]._destroyed = true;
+    })();
 
     if (room.creation) {
       MM.interp && MM.interp.run(MM.resolveCode(room.creation), {

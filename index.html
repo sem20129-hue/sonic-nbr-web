@@ -80,6 +80,15 @@
     background: #1b1b26; border: 1px solid #33334a; border-bottom-width: 2px;
     border-radius: 3px; padding: 0 5px; color: #9a9ab0; font-size: 11px;
   }
+  #fs {
+    font: 12px Consolas, monospace;
+    background: #101018; color: #9a9ab0;
+    border: 1px solid #33334a; border-bottom-width: 2px;
+    border-radius: 4px; padding: 4px 12px; cursor: pointer;
+  }
+  #fs:hover { color: #ffe27a; border-color: #55556a; }
+  body.fakefs #bar, body.fakefs #fs { display: none; }
+  body.fakefs #stage { box-shadow: none; }
 </style>
 </head>
 <body>
@@ -116,6 +125,7 @@
     </div>
   </div>
   <div id="bar">Загрузка…</div>
+  <button id="fs" type="button">⛶ Полный экран (F) · двойной клик по игре</button>
 </div>
 
 <script>
@@ -125,22 +135,23 @@
 </script>
 
 <!-- runtime -->
-<script src="runtime/mm_core.js?v=202610241223"></script>
-<script src="runtime/mm_interp.js?v=202610241223"></script>
-<script src="runtime/mm_builtins.js?v=202610241223"></script>
-<script src="runtime/mm_audio.js?v=202610241223"></script>
-<script src="runtime/mm_nbr.js?v=202610241223"></script>
-<script src="runtime/mm_fanending.js?v=202610241223"></script>
+<script src="runtime/mm_core.js?v=202610242239"></script>
+<script src="runtime/mm_interp.js?v=202610242239"></script>
+<script src="runtime/mm_builtins.js?v=202610242239"></script>
+<script src="runtime/mm_audio.js?v=202610242239"></script>
+<script src="runtime/mm_nbr.js?v=202610242239"></script>
+<script src="runtime/mm_fanending.js?v=202610242239"></script>
 
 <!-- generated game package -->
-<script src="game/code.js?v=202610241223"></script>
-<script src="game/sprites.js?v=202610241223"></script>
-<script src="game/objects.js?v=202610241223"></script>
-<script src="game/rooms.js?v=202610241223"></script>
-<script src="game/scripts.js?v=202610241223"></script>
-<script src="game/sounds.js?v=202610241223"></script>
-<script src="game/fonts.js?v=202610241223"></script>
-<script src="game/assets.js?v=202610241223"></script>
+<script src="game/code.js?v=202610242239"></script>
+<script src="game/sprites.js?v=202610242239"></script>
+<script src="game/objects.js?v=202610242239"></script>
+<script src="game/asset_ids.js?v=202610242239"></script>
+<script src="game/rooms.js?v=202610242239"></script>
+<script src="game/scripts.js?v=202610242239"></script>
+<script src="game/sounds.js?v=202610242239"></script>
+<script src="game/fonts.js?v=202610242239"></script>
+<script src="game/assets.js?v=202610242239"></script>
 
 <script>
 (function () {
@@ -152,14 +163,21 @@
   var hud = document.getElementById('hud');
 
   // --- integer scaling -------------------------------------------------
+  function isFs() {
+    return !!(document.fullscreenElement || document.webkitFullscreenElement ||
+              stage.classList.contains('fakefs'));
+  }
   function fit() {
     var barH = bar ? (bar.offsetHeight || 16) : 16;
-    var availW = window.innerWidth - 24;
-    var availH = window.innerHeight - barH - 40;
+    var full = isFs();
+    var availW = full ? window.innerWidth : window.innerWidth - 24;
+    var availH = full ? window.innerHeight : window.innerHeight - barH - 68;
     if (availW < 80) availW = 80;
     if (availH < 60) availH = 60;
     var raw = Math.min(availW / 640, availH / 480);
-    var scale = raw >= 1 ? Math.floor(raw) : raw;
+    // Windowed mode keeps crisp integer scaling; full screen is asked to fill
+    // the screen edge to edge, so there it uses the exact scale.
+    var scale = (full || raw < 1) ? raw : Math.floor(raw);
     var w = Math.max(1, Math.floor(640 * scale));
     var h = Math.max(1, Math.floor(480 * scale));
     canvas.style.width = w + 'px';
@@ -169,6 +187,36 @@
   }
   window.addEventListener('resize', fit);
   fit();
+
+  // --- fullscreen -------------------------------------------------------
+  // Button + F + double click.  Browsers without requestFullscreen (old iOS)
+  // get a CSS "fake fullscreen": the stage just fills the window.
+  function toggleFs() {
+    try {
+      var full = document.fullscreenElement || document.webkitFullscreenElement;
+      if (full) {
+        var q = document.exitFullscreen || document.webkitExitFullscreen;
+        if (q) q.call(document);
+      } else {
+        var el = stage, rq = el.requestFullscreen || el.webkitRequestFullscreen;
+        if (rq) { rq.call(el); fakeFs(false); }
+        else fakeFs(!stage.classList.contains('fakefs'));
+      }
+    } catch (e) { /* ignore */ }
+  }
+  function fakeFs(on) {
+    stage.classList.toggle('fakefs', on);
+    document.body.classList.toggle('fakefs', on);
+    fit();
+  }
+  document.getElementById('fs').addEventListener('click', toggleFs);
+  stage.addEventListener('dblclick', toggleFs);
+  window.addEventListener('keydown', function (e) {
+    if (e.keyCode === 70 && !e.ctrlKey && !e.altKey && !e.metaKey) toggleFs(); // F
+  });
+  ['fullscreenchange', 'webkitfullscreenchange'].forEach(function (ev) {
+    document.addEventListener(ev, fit);
+  });
 
   // --- boot ------------------------------------------------------------
   var MM = window.MM;

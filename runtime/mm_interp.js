@@ -495,6 +495,10 @@
   }
 
   // GML: имя объекта в выражении -- это id одного из его инстансов.
+  // The instance may also belong to a CHILD object: `Pers_Obj.x` must resolve
+  // to the live Knuckles/Tails/Sonic instance, otherwise every badnik, ground
+  // and camera script reads 0 instead of the player state (that is what made
+  // Knuckles unable to hurt badniks, glide or keep moving).
   var _itCache = Object.create(null);
   var _itVersion = -1;
 
@@ -506,10 +510,14 @@
     var hit = _itCache[key];
     if (hit !== undefined) return hit || v;
     var list = MM.state.instances;
+    var child = null;
     for (var i = 0; i < list.length; i++) {
       var o = list[i];
-      if (!o._destroyed && o.object_index === v) { _itCache[key] = o; return o; }
+      if (o._destroyed || o._deactivated) continue;
+      if (o.object_index === v) { _itCache[key] = o; return o; }
+      if (!child && MM.objectChainHas && MM.objectChainHas(o.object_index, v)) child = o;
     }
+    if (child) { _itCache[key] = child; return child; }
     _itCache[key] = null;
     return v;
   }
@@ -545,9 +553,14 @@
       return gv === undefined ? 0 : gv;
     }
     var self = ctx.self;
-    if (self && typeof self === 'object' && name in self) {
-      var v = self[name];
-      return v === undefined ? 0 : v;
+    if (self && typeof self === 'object') {
+      // speed/direction are live views over hspeed/vspeed in GameMaker.
+      if (name === 'speed') return MM.motionSpeed(self);
+      if (name === 'direction') return MM.motionDirection(self);
+      if (name in self) {
+        var v = self[name];
+        return v === undefined ? 0 : v;
+      }
     }
     if (MM.builtinVars && MM.builtinVars[name]) return MM.builtinVars[name].get(ctx);
     if (MM.constants && (name in MM.constants)) return MM.constants[name];
@@ -652,10 +665,7 @@
     if (node.type === 'id') return identValue(node.name, ctx);
     if (node.type === 'member') {
       var obj = instTarget(evalExpr(node.obj, ctx));
-      if (obj && typeof obj === 'object') {
-        var v = obj[node.name];
-        return v === undefined ? 0 : v;
-      }
+      if (obj && typeof obj === 'object') return memberGet(obj, node.name);
       return 0;
     }
     if (node.type === 'index') {
@@ -694,13 +704,26 @@
       if (name === 'self' || name === 'other' || name === 'global') { MM.warn('нельзя присвоить ' + name); return; }
       if (ctx.scope && ctx.scope.setExisting(name, value)) return;
       if (MM.interp.globalNames[name]) { MM.globals[name] = value; return; }
-      if (ctx.self && typeof ctx.self === 'object') { ctx.self[name] = value; return; }
+      if (ctx.self && typeof ctx.self === 'object') {
+        if (name === 'speed') { MM.motionSetSpeed(ctx.self, value); return; }
+        if (name === 'direction') { MM.motionSetDirection(ctx.self, value); return; }
+        ctx.self[name] = value; return;
+      }
       MM.warn('нет self для присвоения "' + name + '"');
       return;
     }
     if (node.type === 'member') {
       var obj = instTarget(evalExpr(node.obj, ctx));
-      if (obj && typeof obj === 'object') { obj[node.name] = value; return; }
+      if (obj && typeof obj === 'object') {
+        var mval = value;
+        if (node.name === 'speed') { MM.motionSetSpeed(obj, mval); return; }
+        if (node.name === 'direction') { MM.motionSetDirection(obj, mval); return; }
+        if ((node.name === 'sprite_index' || node.name === 'mask_index') && typeof mval === 'number') {
+          mval = MM.resolveSprite(mval); // GML may store a raw resource id
+        }
+        obj[node.name] = mval;
+        return;
+      }
       MM.warn('присвоение свойства у не-объекта: ' + node.name);
       return;
     }
@@ -803,6 +826,23 @@
   }
 
   // --- вычисление выражений ------------------------------------------
+  // GML exposes the mask box as instance variables: `Pers_Obj.bbox_bottom`
+  // must work exactly like the bare name inside the instance.
+  function memberGet(obj, name) {
+    if (name === 'speed') return MM.motionSpeed(obj);
+    if (name === 'direction') return MM.motionDirection(obj);
+    if (name === 'bbox_left' || name === 'bbox_right' || name === 'bbox_top' || name === 'bbox_bottom') {
+      var bb = MM.bbox(obj);
+      if (!bb) return 0;
+      if (name === 'bbox_left') return bb.l;
+      if (name === 'bbox_right') return bb.r;
+      if (name === 'bbox_top') return bb.t;
+      return bb.b;
+    }
+    var v = obj[name];
+    return v === undefined ? 0 : v;
+  }
+
   function evalExpr(node, ctx) {
     switch (node.type) {
       case 'num': return node.v;
@@ -812,8 +852,7 @@
         var obj = instTarget(evalExpr(node.obj, ctx));
         if (obj == null) return 0;
         if (typeof obj !== 'object') return 0;
-        var v = obj[node.name];
-        return v === undefined ? 0 : v;
+        return memberGet(obj, node.name);
       }
       case 'index': {
         var base = instTarget(evalExpr(node.obj, ctx));
@@ -980,8 +1019,20 @@
   }
 
   function checkOps(ctx) {
-    ctx.ops.count++;
-    if (ctx.ops.count > 20000000) {
+    var o = ctx.ops;
+    o.count++;
+    // A decompiled loop can spin forever on a collision condition the runner
+    // evaluates differently.  Abort the event after a few seconds instead of
+    // taking the whole tab down with it.
+    if ((o.count & 2047) === 0) {
+      var now = Date.now();
+      if (!o.t0) o.t0 = now;
+      else if (now - o.t0 > 4000) {
+        o.t0 = now;
+        throw new Error('MM: event runs too long (' + (ctx.name || '?') + ')');
+      }
+    }
+    if (o.count > 20000000) {
       ctx.ops.count = 0;
       throw new Error('MM подозревает бесконечный цикл в ' + (ctx.name || '?'));
     }
