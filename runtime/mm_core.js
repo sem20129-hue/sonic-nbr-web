@@ -821,6 +821,62 @@
     }
   }
 
+  // -------------------------------------------------------------------
+  // Players must never stay wedged inside level geometry.  The decompiled
+  // game blocks horizontal movement with a one-pixel look-ahead, but vertical
+  // motion (flying, springs) can push the mask into a wall sideways; the
+  // "ground" probe then sees that wall and disables gravity, leaving the hero
+  // hanging in mid-air forever.  Revert the offending axis instead.
+  // -------------------------------------------------------------------
+  function isPlayerInst(inst) {
+    var def = inst.object_index;
+    if (!def) return false;
+    if (def._isPlayer === undefined) def._isPlayer = MM.objectChainHas(def, MM.objects['Pers_Obj']);
+    return def._isPlayer;
+  }
+
+  function isLevelSolid(def) {
+    if (!def) return false;
+    return MM.objectChainHas(def, MM.objects['Solid_Mask']) ||
+           MM.objectChainHas(def, MM.objects['Break_Mask']);
+  }
+
+  function overlapsLevelSolid(inst, x, y) {
+    var box = MM.bbox(inst, x, y);
+    if (!box) return false;
+    var list = MM.state.instances;
+    for (var i = 0; i < list.length; i++) {
+      var o = list[i];
+      if (o === inst || o._destroyed || o._deactivated) continue;
+      if (!isLevelSolid(o.object_index)) continue;
+      var ob = MM.bbox(o);
+      if (ob && box.l < ob.r && box.r > ob.l && box.t < ob.b && box.b > ob.t) return true;
+    }
+    return false;
+  }
+
+  function resolvePlayerOverlap() {
+    var list = MM.state.instances;
+    for (var i = 0; i < list.length; i++) {
+      var inst = list[i];
+      if (inst._destroyed || inst._deactivated || !isPlayerInst(inst)) continue;
+      if (inst.y < 0) {
+        inst.y = 0;
+        if (inst.vspeed < 0.2) inst.vspeed = 0.2;
+      }
+      if (!overlapsLevelSolid(inst, inst.x, inst.y)) continue;
+      if (inst._px !== undefined && !overlapsLevelSolid(inst, inst._px, inst.y)) {
+        inst.x = inst._px;
+        MM.globals.vel = 0;
+        continue;
+      }
+      if (inst._py !== undefined && !overlapsLevelSolid(inst, inst.x, inst._py)) {
+        inst.y = inst._py;
+        inst.vspeed = 0;
+      }
+    }
+  }
+
   function tickCollisions() {
     var list = MM.state.instances;
     for (var i = 0; i < list.length; i++) {
@@ -1064,6 +1120,10 @@
     var list;
     var i;
 
+    list = MM.state.instances;
+    for (i = 0; i < list.length; i++) {
+      if (!list[i]._destroyed && isPlayerInst(list[i])) { list[i]._px = list[i].x; list[i]._py = list[i].y; }
+    }
     list = MM.state.instances.slice();
     for (i = 0; i < list.length; i++) if (!list[i]._destroyed) MM.runEvent(list[i], 'begin_step');
     tickAlarms();
@@ -1073,6 +1133,7 @@
     tickPaths();
     tickOutsideRoom();
     tickCollisions();
+    resolvePlayerOverlap();
     list = MM.state.instances.slice();
     for (i = 0; i < list.length; i++) if (!list[i]._destroyed) MM.runEvent(list[i], 'end_step');
     tickAnimation();
