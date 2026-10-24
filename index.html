@@ -125,22 +125,22 @@
 </script>
 
 <!-- runtime -->
-<script src="runtime/mm_core.js?v=202610230957"></script>
-<script src="runtime/mm_interp.js?v=202610230957"></script>
-<script src="runtime/mm_builtins.js?v=202610230957"></script>
-<script src="runtime/mm_audio.js?v=202610230957"></script>
-<script src="runtime/mm_nbr.js?v=202610230957"></script>
-<script src="runtime/mm_fanending.js?v=202610230957"></script>
+<script src="runtime/mm_core.js?v=202610241223"></script>
+<script src="runtime/mm_interp.js?v=202610241223"></script>
+<script src="runtime/mm_builtins.js?v=202610241223"></script>
+<script src="runtime/mm_audio.js?v=202610241223"></script>
+<script src="runtime/mm_nbr.js?v=202610241223"></script>
+<script src="runtime/mm_fanending.js?v=202610241223"></script>
 
 <!-- generated game package -->
-<script src="game/code.js?v=202610230957"></script>
-<script src="game/sprites.js?v=202610230957"></script>
-<script src="game/objects.js?v=202610230957"></script>
-<script src="game/rooms.js?v=202610230957"></script>
-<script src="game/scripts.js?v=202610230957"></script>
-<script src="game/sounds.js?v=202610230957"></script>
-<script src="game/fonts.js?v=202610230957"></script>
-<script src="game/assets.js?v=202610230957"></script>
+<script src="game/code.js?v=202610241223"></script>
+<script src="game/sprites.js?v=202610241223"></script>
+<script src="game/objects.js?v=202610241223"></script>
+<script src="game/rooms.js?v=202610241223"></script>
+<script src="game/scripts.js?v=202610241223"></script>
+<script src="game/sounds.js?v=202610241223"></script>
+<script src="game/fonts.js?v=202610241223"></script>
+<script src="game/assets.js?v=202610241223"></script>
 
 <script>
 (function () {
@@ -210,6 +210,9 @@
       pretext.textContent = 'Всё загружено' + (r && r.failed ? ' (кроме ' + r.failed + ' файлов)' : '');
       hint.className = 'ready';
       hint.textContent = 'Нажми, чтобы включить звук и начать';
+      // Effects are decoded in the background now, so the first jump or ring
+      // does not arrive late.
+      if (MM.audio && MM.audio.warmDecode) MM.audio.warmDecode();
     }
   });
 
@@ -242,6 +245,7 @@
     if (!ready) return;
     overlay.classList.add('hidden');
     if (MM.audio && MM.audio.unlock) MM.audio.unlock();
+    if (MM.audio && MM.audio.warmDecode) MM.audio.warmDecode();
     if (MM.state) MM.state.paused = false;
     canvas.focus();
   }

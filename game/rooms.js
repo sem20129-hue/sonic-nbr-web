@@ -25,7 +25,9 @@
       { enabled:false, x:0, y:0, w:640, h:480, portX:0, portY:0, portW:640, portH:480, borderX:32, borderY:32, speedX:-1, speedY:-1, object:null },
       { enabled:false, x:0, y:0, w:640, h:480, portX:0, portY:0, portW:640, portH:480, borderX:32, borderY:32, speedX:-1, speedY:-1, object:null }
     ],
-    bgLayers: [],
+    bgLayers: [
+      { idx:0, img:"assets/bg/backBlack.png", x:0, y:0, tiledH:true, tiledV:true, stretch:false, speedX:0, speedY:0, foreground:true, enabled:false },
+    ],
     instances: [
       { obj:"LangS_Title", x:320, y:128, sx:1, sy:1, rot:0, imgIdx:0, cc:null, pc:null },
       { obj:"LangS_ENG", x:320, y:256, sx:1, sy:1, rot:0, imgIdx:0, cc:null, pc:null },
@@ -149,7 +151,7 @@
       { enabled:false, x:0, y:0, w:640, h:480, portX:0, portY:0, portW:640, portH:480, borderX:32, borderY:32, speedX:-1, speedY:-1, object:null }
     ],
     bgLayers: [
-      { img: "assets/bg/backRedMist.png", x:0, y:0, tiledH:true, tiledV:true, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true }
+      { idx:0, img:"assets/bg/backRedMist.png", x:0, y:0, tiledH:true, tiledV:true, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true },
     ],
     instances: [
       { obj:"MS_1", x:64, y:128, sx:1, sy:1, rot:0, imgIdx:0, cc:null, pc:null },
@@ -214,7 +216,10 @@
       { enabled:false, x:0, y:0, w:640, h:480, portX:0, portY:0, portW:640, portH:480, borderX:32, borderY:32, speedX:-1, speedY:-1, object:null },
       { enabled:false, x:0, y:0, w:640, h:480, portX:0, portY:0, portW:640, portH:480, borderX:32, borderY:32, speedX:-1, speedY:-1, object:null }
     ],
-    bgLayers: [],
+    bgLayers: [
+      { idx:0, img:"assets/bg/backBlack.png", x:0, y:0, tiledH:false, tiledV:false, stretch:true, speedX:0, speedY:0, foreground:true, enabled:false },
+      { idx:1, img:"assets/bg/backWhite.png", x:0, y:0, tiledH:true, tiledV:true, stretch:false, speedX:0, speedY:0, foreground:true, enabled:false },
+    ],
     instances: [
       { obj:"GHZ_Back2", x:320, y:32, sx:1, sy:1, rot:0, imgIdx:0, cc:null, pc:null },
       { obj:"GHZ_Back", x:320, y:192, sx:1, sy:1, rot:0, imgIdx:0, cc:null, pc:null },
@@ -1828,7 +1833,10 @@
       { enabled:false, x:0, y:0, w:640, h:480, portX:0, portY:0, portW:640, portH:480, borderX:32, borderY:32, speedX:-1, speedY:-1, object:null }
     ],
     bgLayers: [
-      { img: "assets/bg/backAAZ_Back.png", x:0, y:95, tiledH:true, tiledV:true, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true }
+      { idx:0, img:"assets/bg/backBlack.png", x:0, y:0, tiledH:true, tiledV:true, stretch:false, speedX:0, speedY:0, foreground:true, enabled:false },
+      { idx:1, img:"assets/bg/backAAZ_Back.png", x:0, y:95, tiledH:true, tiledV:true, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true },
+      { idx:3, img:"assets/bg/backAAZ_Back2.png", x:0, y:95, tiledH:true, tiledV:true, stretch:false, speedX:0, speedY:0, foreground:false, enabled:false },
+      { idx:4, img:"assets/bg/backAAZ_Back2BIG.png", x:200, y:-80, tiledH:true, tiledV:true, stretch:false, speedX:0, speedY:0, foreground:false, enabled:false },
     ],
     instances: [
       { obj:"AAZ_Trees", x:384, y:1024, sx:1, sy:1, rot:0, imgIdx:0, cc:null, pc:null },
@@ -4016,7 +4024,9 @@
       { enabled:false, x:0, y:0, w:640, h:480, portX:0, portY:0, portW:640, portH:480, borderX:32, borderY:32, speedX:-1, speedY:-1, object:null },
       { enabled:false, x:0, y:0, w:640, h:480, portX:0, portY:0, portW:640, portH:480, borderX:32, borderY:32, speedX:-1, speedY:-1, object:null }
     ],
-    bgLayers: [],
+    bgLayers: [
+      { idx:0, img:"assets/bg/backBlack.png", x:0, y:0, tiledH:true, tiledV:true, stretch:false, speedX:0, speedY:0, foreground:true, enabled:false },
+    ],
     instances: [],
     creation: "@gml_Room_GU_9_Create"
   });
@@ -4038,7 +4048,7 @@
       { enabled:false, x:0, y:0, w:640, h:480, portX:0, portY:0, portW:640, portH:480, borderX:32, borderY:32, speedX:-1, speedY:-1, object:null }
     ],
     bgLayers: [
-      { img: "assets/bg/backHS2Back.png", x:0, y:0, tiledH:true, tiledV:false, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true }
+      { idx:1, img:"assets/bg/backHS2Back.png", x:0, y:0, tiledH:true, tiledV:false, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true },
     ],
     instances: [
       { obj:"TailsLive", x:480, y:2580, sx:1, sy:1, rot:0, imgIdx:0, cc:null, pc:null },
@@ -5776,7 +5786,7 @@
       { enabled:false, x:0, y:0, w:640, h:480, portX:0, portY:0, portW:640, portH:480, borderX:32, borderY:32, speedX:-1, speedY:-1, object:null }
     ],
     bgLayers: [
-      { img: "assets/bg/backRedMist.png", x:0, y:0, tiledH:true, tiledV:true, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true }
+      { idx:1, img:"assets/bg/backRedMist.png", x:0, y:0, tiledH:true, tiledV:true, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true },
     ],
     instances: [
       { obj:"TailsLive", x:4480, y:848, sx:1, sy:1, rot:0, imgIdx:0, cc:null, pc:null },
@@ -6149,7 +6159,7 @@
       { enabled:false, x:0, y:0, w:640, h:480, portX:0, portY:0, portW:640, portH:480, borderX:32, borderY:32, speedX:-1, speedY:-1, object:null }
     ],
     bgLayers: [
-      { img: "assets/bg/backTC_Back.png", x:0, y:0, tiledH:true, tiledV:true, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true }
+      { idx:1, img:"assets/bg/backTC_Back.png", x:0, y:0, tiledH:true, tiledV:true, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true },
     ],
     instances: [
       { obj:"TailsLive", x:3405, y:900, sx:1, sy:1, rot:0, imgIdx:0, cc:null, pc:null },
@@ -6688,7 +6698,7 @@
       { enabled:false, x:0, y:0, w:640, h:480, portX:0, portY:0, portW:640, portH:480, borderX:32, borderY:32, speedX:-1, speedY:-1, object:null }
     ],
     bgLayers: [
-      { img: "assets/bg/backRace_Back.png", x:0, y:0, tiledH:true, tiledV:true, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true }
+      { idx:1, img:"assets/bg/backRace_Back.png", x:0, y:0, tiledH:true, tiledV:true, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true },
     ],
     instances: [
       { obj:"RR_Signpost", x:64592, y:1296, sx:1, sy:1, rot:0, imgIdx:0, cc:null, pc:null },
@@ -8145,9 +8155,11 @@
       { enabled:false, x:0, y:0, w:640, h:480, portX:0, portY:0, portW:640, portH:480, borderX:32, borderY:32, speedX:-1, speedY:-1, object:null }
     ],
     bgLayers: [
-      { img: "assets/bg/backTS1_1.png", x:0, y:20, tiledH:true, tiledV:false, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true },
-      { img: "assets/bg/backTS1_3.png", x:0, y:110, tiledH:true, tiledV:false, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true },
-      { img: "assets/bg/backTS1_5.png", x:0, y:0, tiledH:true, tiledV:true, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true }
+      { idx:1, img:"assets/bg/backTS1_1.png", x:0, y:20, tiledH:true, tiledV:false, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true },
+      { idx:2, img:"assets/bg/backTS1_3.png", x:0, y:110, tiledH:true, tiledV:false, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true },
+      { idx:3, img:"assets/bg/backTS1_4.png", x:0, y:-20, tiledH:true, tiledV:false, stretch:false, speedX:0, speedY:0, foreground:false, enabled:false },
+      { idx:4, img:"assets/bg/backTS1_5.png", x:0, y:0, tiledH:true, tiledV:true, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true },
+      { idx:5, img:"assets/bg/backTS1_5.png", x:0, y:0, tiledH:true, tiledV:true, stretch:false, speedX:0, speedY:0, foreground:false, enabled:false },
     ],
     instances: [
       { obj:"TailsLive", x:1056, y:1328, sx:1, sy:1, rot:0, imgIdx:0, cc:null, pc:null },
@@ -8733,9 +8745,9 @@
       { enabled:false, x:0, y:0, w:640, h:480, portX:0, portY:0, portW:640, portH:480, borderX:32, borderY:32, speedX:-1, speedY:-1, object:null }
     ],
     bgLayers: [
-      { img: "assets/bg/backTS1_1.png", x:0, y:20, tiledH:true, tiledV:false, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true },
-      { img: "assets/bg/backTS1_3.png", x:0, y:110, tiledH:true, tiledV:false, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true },
-      { img: "assets/bg/backTS1_5.png", x:0, y:0, tiledH:true, tiledV:true, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true }
+      { idx:1, img:"assets/bg/backTS1_1.png", x:0, y:20, tiledH:true, tiledV:false, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true },
+      { idx:2, img:"assets/bg/backTS1_3.png", x:0, y:110, tiledH:true, tiledV:false, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true },
+      { idx:3, img:"assets/bg/backTS1_5.png", x:0, y:0, tiledH:true, tiledV:true, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true },
     ],
     instances: [
       { obj:"TTS1_Ground", x:256, y:352, sx:1, sy:1, rot:0, imgIdx:0, cc:null, pc:null },
@@ -8769,12 +8781,13 @@
       { enabled:false, x:0, y:0, w:640, h:480, portX:0, portY:0, portW:640, portH:480, borderX:32, borderY:32, speedX:-1, speedY:-1, object:null }
     ],
     bgLayers: [
-      { img: "assets/bg/backSemi_Black.png", x:0, y:300, tiledH:true, tiledV:false, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true },
-      { img: "assets/bg/backBlackTrees1.png", x:0, y:216, tiledH:true, tiledV:false, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true },
-      { img: "assets/bg/backBlackTrees2.png", x:120, y:205, tiledH:true, tiledV:false, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true },
-      { img: "assets/bg/backBlackTrees3.png", x:280, y:275, tiledH:true, tiledV:false, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true },
-      { img: "assets/bg/back_DeadAnimal1.png", x:0, y:337, tiledH:true, tiledV:false, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true },
-      { img: "assets/bg/back_DeadAnimal2.png", x:50, y:336, tiledH:true, tiledV:false, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true }
+      { idx:0, img:"assets/bg/backBlack.png", x:0, y:0, tiledH:true, tiledV:true, stretch:false, speedX:0, speedY:0, foreground:true, enabled:false },
+      { idx:1, img:"assets/bg/backSemi_Black.png", x:0, y:300, tiledH:true, tiledV:false, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true },
+      { idx:2, img:"assets/bg/backBlackTrees1.png", x:0, y:216, tiledH:true, tiledV:false, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true },
+      { idx:3, img:"assets/bg/backBlackTrees2.png", x:120, y:205, tiledH:true, tiledV:false, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true },
+      { idx:4, img:"assets/bg/backBlackTrees3.png", x:280, y:275, tiledH:true, tiledV:false, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true },
+      { idx:5, img:"assets/bg/back_DeadAnimal1.png", x:0, y:337, tiledH:true, tiledV:false, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true },
+      { idx:6, img:"assets/bg/back_DeadAnimal2.png", x:50, y:336, tiledH:true, tiledV:false, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true },
     ],
     instances: [
       { obj:"LV_Ground", x:64, y:416, sx:1, sy:1, rot:0, imgIdx:0, cc:null, pc:null },
@@ -9079,12 +9092,12 @@
       { enabled:false, x:0, y:0, w:640, h:480, portX:0, portY:0, portW:640, portH:480, borderX:32, borderY:32, speedX:-1, speedY:-1, object:null }
     ],
     bgLayers: [
-      { img: "assets/bg/backSemi_Black.png", x:0, y:300, tiledH:true, tiledV:false, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true },
-      { img: "assets/bg/backBlackTrees1.png", x:0, y:216, tiledH:true, tiledV:false, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true },
-      { img: "assets/bg/backBlackTrees2.png", x:120, y:205, tiledH:true, tiledV:false, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true },
-      { img: "assets/bg/backBlackTrees3.png", x:280, y:275, tiledH:true, tiledV:false, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true },
-      { img: "assets/bg/back_DeadAnimal1.png", x:0, y:337, tiledH:true, tiledV:false, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true },
-      { img: "assets/bg/back_DeadAnimal2.png", x:50, y:336, tiledH:true, tiledV:false, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true }
+      { idx:1, img:"assets/bg/backSemi_Black.png", x:0, y:300, tiledH:true, tiledV:false, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true },
+      { idx:2, img:"assets/bg/backBlackTrees1.png", x:0, y:216, tiledH:true, tiledV:false, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true },
+      { idx:3, img:"assets/bg/backBlackTrees2.png", x:120, y:205, tiledH:true, tiledV:false, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true },
+      { idx:4, img:"assets/bg/backBlackTrees3.png", x:280, y:275, tiledH:true, tiledV:false, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true },
+      { idx:5, img:"assets/bg/back_DeadAnimal1.png", x:0, y:337, tiledH:true, tiledV:false, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true },
+      { idx:6, img:"assets/bg/back_DeadAnimal2.png", x:50, y:336, tiledH:true, tiledV:false, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true },
     ],
     instances: [
       { obj:"LV_Ground", x:64, y:416, sx:1, sy:1, rot:0, imgIdx:0, cc:null, pc:null },
@@ -9193,7 +9206,8 @@
       { enabled:false, x:0, y:0, w:640, h:480, portX:0, portY:0, portW:640, portH:480, borderX:32, borderY:32, speedX:-1, speedY:-1, object:null }
     ],
     bgLayers: [
-      { img: "assets/bg/background2.png", x:0, y:0, tiledH:true, tiledV:true, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true }
+      { idx:0, img:"assets/bg/background2.png", x:0, y:0, tiledH:true, tiledV:true, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true },
+      { idx:1, img:"assets/bg/ELPSMG_Back2.png", x:0, y:0, tiledH:true, tiledV:true, stretch:false, speedX:0, speedY:0, foreground:false, enabled:false },
     ],
     instances: [
       { obj:"GHZ_Ground", x:128, y:448, sx:1, sy:1, rot:0, imgIdx:0, cc:null, pc:null },
@@ -9240,7 +9254,7 @@
       { enabled:false, x:0, y:0, w:640, h:480, portX:0, portY:0, portW:640, portH:480, borderX:32, borderY:32, speedX:-1, speedY:-1, object:null }
     ],
     bgLayers: [
-      { img: "assets/bg/backRedMist.png", x:0, y:0, tiledH:true, tiledV:true, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true }
+      { idx:1, img:"assets/bg/backRedMist.png", x:0, y:0, tiledH:true, tiledV:true, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true },
     ],
     instances: [
       { obj:"MYCR_Background", x:592, y:928, sx:1, sy:1, rot:0, imgIdx:0, cc:null, pc:null },
@@ -9952,7 +9966,8 @@
       { enabled:false, x:0, y:0, w:640, h:480, portX:0, portY:0, portW:640, portH:480, borderX:32, borderY:32, speedX:-1, speedY:-1, object:null }
     ],
     bgLayers: [
-      { img: "assets/bg/backRedMist.png", x:0, y:0, tiledH:true, tiledV:true, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true }
+      { idx:1, img:"assets/bg/backRedMist.png", x:0, y:0, tiledH:true, tiledV:true, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true },
+      { idx:2, img:"assets/bg/backRedMist.png", x:0, y:0, tiledH:true, tiledV:true, stretch:false, speedX:0, speedY:0, foreground:true, enabled:false },
     ],
     instances: [
       { obj:"RedSpringAngleR", x:14288, y:3760, sx:1, sy:1, rot:0, imgIdx:0, cc:null, pc:null },
@@ -10702,8 +10717,8 @@
       { enabled:false, x:0, y:0, w:640, h:480, portX:0, portY:0, portW:640, portH:480, borderX:32, borderY:32, speedX:-1, speedY:-1, object:null }
     ],
     bgLayers: [
-      { img: "assets/bg/backBloodTemple.png", x:0, y:0, tiledH:true, tiledV:true, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true },
-      { img: "assets/bg/backBloodGround.png", x:0, y:350, tiledH:true, tiledV:false, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true }
+      { idx:0, img:"assets/bg/backBloodTemple.png", x:0, y:0, tiledH:true, tiledV:true, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true },
+      { idx:1, img:"assets/bg/backBloodGround.png", x:0, y:350, tiledH:true, tiledV:false, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true },
     ],
     instances: [],
     creation: null
@@ -10726,7 +10741,10 @@
       { enabled:false, x:0, y:0, w:640, h:480, portX:0, portY:0, portW:640, portH:480, borderX:32, borderY:32, speedX:-1, speedY:-1, object:null }
     ],
     bgLayers: [
-      { img: "assets/bg/backEggB_Back.png", x:0, y:0, tiledH:true, tiledV:true, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true }
+      { idx:0, img:"assets/bg/backBlack.png", x:0, y:0, tiledH:true, tiledV:true, stretch:false, speedX:0, speedY:0, foreground:true, enabled:false },
+      { idx:1, img:"assets/bg/backEggB_Back.png", x:0, y:0, tiledH:true, tiledV:true, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true },
+      { idx:2, img:"assets/bg/backRed.png", x:0, y:0, tiledH:true, tiledV:true, stretch:false, speedX:0, speedY:0, foreground:true, enabled:false },
+      { idx:7, img:"assets/bg/backBlack.png", x:0, y:0, tiledH:true, tiledV:true, stretch:false, speedX:0, speedY:0, foreground:true, enabled:false },
     ],
     instances: [
       { obj:"EggB1_BackBots1", x:960, y:288, sx:1, sy:1, rot:0, imgIdx:0, cc:null, pc:null },
@@ -10810,7 +10828,9 @@
       { enabled:false, x:0, y:0, w:640, h:480, portX:0, portY:0, portW:640, portH:480, borderX:32, borderY:32, speedX:-1, speedY:-1, object:null }
     ],
     bgLayers: [
-      { img: "assets/bg/backEggB_Back.png", x:0, y:0, tiledH:true, tiledV:true, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true }
+      { idx:0, img:"assets/bg/backBlack.png", x:0, y:0, tiledH:true, tiledV:true, stretch:false, speedX:0, speedY:0, foreground:true, enabled:false },
+      { idx:1, img:"assets/bg/backEggB_Back.png", x:0, y:0, tiledH:true, tiledV:true, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true },
+      { idx:2, img:"assets/bg/backEGGB_Ground.png", x:0, y:1800, tiledH:true, tiledV:false, stretch:false, speedX:0, speedY:0, foreground:true, enabled:false },
     ],
     instances: [
       { obj:"EggB2_Tuba2_2", x:13248, y:1747, sx:1, sy:1, rot:0, imgIdx:0, cc:null, pc:null },
@@ -10860,11 +10880,13 @@
       { enabled:false, x:0, y:0, w:640, h:480, portX:0, portY:0, portW:640, portH:480, borderX:32, borderY:32, speedX:-1, speedY:-1, object:null }
     ],
     bgLayers: [
-      { img: "assets/bg/backEllipsis_BackgroundLight.png", x:0, y:0, tiledH:true, tiledV:true, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true },
-      { img: "assets/bg/backEllipsis_Background2Light.png", x:0, y:5, tiledH:true, tiledV:true, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true },
-      { img: "assets/bg/backEllipsis_BackgroundLampsOn.png", x:0, y:0, tiledH:true, tiledV:true, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true },
-      { img: "assets/bg/ELPSMG_Back1.png", x:0, y:5500, tiledH:true, tiledV:false, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true },
-      { img: "assets/bg/ELPSMG_Back2.png", x:0, y:5550, tiledH:true, tiledV:false, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true }
+      { idx:0, img:"assets/bg/backBlack.png", x:0, y:0, tiledH:true, tiledV:true, stretch:false, speedX:0, speedY:0, foreground:true, enabled:false },
+      { idx:1, img:"assets/bg/backEllipsis_BackgroundLight.png", x:0, y:0, tiledH:true, tiledV:true, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true },
+      { idx:2, img:"assets/bg/backEllipsis_Background2Light.png", x:0, y:5, tiledH:true, tiledV:true, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true },
+      { idx:3, img:"assets/bg/backEllipsis_BackgroundLampsOn.png", x:0, y:0, tiledH:true, tiledV:true, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true },
+      { idx:4, img:"assets/bg/backWhite.png", x:0, y:0, tiledH:true, tiledV:true, stretch:false, speedX:0, speedY:0, foreground:true, enabled:false },
+      { idx:6, img:"assets/bg/ELPSMG_Back1.png", x:0, y:5500, tiledH:true, tiledV:false, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true },
+      { idx:7, img:"assets/bg/ELPSMG_Back2.png", x:0, y:5550, tiledH:true, tiledV:false, stretch:false, speedX:0, speedY:0, foreground:false, enabled:true },
     ],
     instances: [
       { obj:"EggB2_Tuba2_2", x:78, y:448, sx:-1, sy:1, rot:0, imgIdx:0, cc:null, pc:null },

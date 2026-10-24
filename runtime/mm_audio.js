@@ -123,6 +123,15 @@
         if (fileBuffers[fileMusic.src]) startFileMusic();
         else loadFileBuffer(fileMusic.src);
       }
+      // Sounds that were requested before there was a context are still queued;
+      // replay them (latest first) so the first effect is not lost.
+      for (var qk in pendingPlays) {
+        var q = pendingPlays[qk];
+        for (var qi = q.length - 1; qi >= 0; qi--) {
+          try { playFile(q[qi].name, qk, q[qi].opts); } catch (e) { /* ignore */ }
+        }
+      }
+      pendingPlays = {};
       preloadCommon();
       return true;
     } catch (e) {
@@ -465,13 +474,12 @@
     music.name = null;
     music.def = null;
     music.step = 0;
-    if (ctx && musicFade) {
-      try {
-        var now = ctx.currentTime;
-        musicFade.gain.cancelScheduledValues(now);
-        musicFade.gain.setValueAtTime(musicFade.gain.value, now);
-        musicFade.gain.linearRampToValueAtTime(0, now + 0.06);
-      } catch (e) { /* ignore */ }
+    // Only the synthesized notes are stopped here.  The shared music bus is
+    // NOT faded: file-backed music (the whole ported soundtrack) goes through
+    // the same bus, so fading it to zero silenced every track that followed
+    // -- the "music does not play" bug.  GML calls audio_stop_music() before
+    // almost every audio_play_music(), so this fired on every room change.
+    if (ctx) {
       var when = ctx.currentTime + 0.08;
       for (var i = 0; i < music.srcs.length; i++) {
         try { music.srcs[i].s.stop(when); } catch (e) { /* ignore */ }
@@ -518,6 +526,8 @@
   var fileBytesLoading = {};
   var fileBytesWaiters = {};
   var liveFiles = {};     // name -> [{ s: node }]
+  var soundGain = {};     // name -> gain set by audio_sound_gain (persists)
+  var pendingPlays = {};  // url -> [{ name, opts }] waiting for a decode
   var lastFileError = null;
   var fileMusic = { name: null, src: null, node: null, gain: null, wantLoop: true,
                     startAt: 0, offset: 0, paused: false };
@@ -529,18 +539,61 @@
   var decodedBytes = 0;
   var decodedOrder = [];
 
+  function isEffectUrl(url) { return /\.wav($|\?)/i.test(String(url)); }
+
   function rememberDecoded(url, buf) {
     var size = (buf.length || 0) * (buf.numberOfChannels || 2) * 4;
     if (!size || size > MAX_DECODED_BYTES) return;
-    decodedOrder.push({ url: url, size: size });
-    decodedBytes += size;
+    var rec = { url: url, size: size, pinned: isEffectUrl(url) };
+    decodedOrder.push(rec);
+    if (!rec.pinned) decodedBytes += size;
     var guard = 0;
-    while (decodedBytes > MAX_DECODED_BYTES && decodedOrder.length > 1 && guard++ < 64) {
-      var rec = decodedOrder.shift();
-      if (rec.url === fileMusic.src && fileMusic.name) { decodedOrder.push(rec); continue; }
-      if (!(rec.url in fileBuffers)) { decodedBytes -= rec.size; continue; }
-      delete fileBuffers[rec.url];
-      decodedBytes -= rec.size;
+    while (decodedBytes > MAX_DECODED_BYTES && decodedOrder.length > 1 && guard++ < 128) {
+      var old = decodedOrder.shift();
+      if (old.pinned) { decodedOrder.push(old); continue; }
+      if (old.url === fileMusic.src && fileMusic.name) { decodedOrder.push(old); continue; }
+      if (old.url in fileBuffers) delete fileBuffers[old.url];
+      decodedBytes -= old.size;
+    }
+  }
+
+  // ---- background decode of every effect --------------------------------
+  // Decoding on first use costs a visible pause: the sound that was asked for
+  // arrives late.  Effects are small (all of them together are ~47 MB of PCM),
+  // so they are decoded once, slowly, in the background.
+  var warmQueue = null;
+  var warmActive = false;
+
+  function warmPump() {
+    if (!warmQueue || !warmQueue.length) { warmQueue = null; warmActive = false; return; }
+    var src = warmQueue.shift();
+    if (!fileBuffers[src] && !fileLoading[src]) loadFileBuffer(src);
+    setTimeout(warmPump, 40);
+  }
+
+  function warmDecode() {
+    if (warmActive) return true;
+    if (!isReady() && !init()) return false;
+    var list = [], sounds = MM.soundFiles || {};
+    for (var n in sounds) {
+      var f = sounds[n];
+      if (!f || !f.src || fileBuffers[f.src] || !isEffectUrl(f.src)) continue;
+      if (!fileBytes[f.src]) continue;   // not prefetched: leave it on demand
+      list.push(f.src);
+    }
+    if (!list.length) return true;
+    warmQueue = list;
+    warmActive = true;
+    setTimeout(warmPump, 30);
+    return true;
+  }
+
+  function flushPending(url) {
+    var q = pendingPlays[url];
+    if (!q || !q.length) return;
+    pendingPlays[url] = [];
+    for (var i = 0; i < q.length; i++) {
+      try { playFile(q[i].name, url, q[i].opts); } catch (e) {}
     }
   }
 
@@ -558,6 +611,7 @@
           fileBuffers[url] = buf;
           rememberDecoded(url, buf);
           fileLoading[url] = false;
+          flushPending(url);
           if (fileMusic.src === url && fileMusic.name && !fileMusic.node) startFileMusic();
         })
         .catch(function (e) {
@@ -624,7 +678,15 @@
     if (!isReady()) return false;
     resumeCtx();
     var buf = fileBuffers[src];
-    if (!buf) { loadFileBuffer(src); return false; }
+    if (!buf) {
+      // Not decoded yet: remember the request so it is not silently dropped,
+      // and it will start the moment the decode finishes.
+      var q = pendingPlays[src] || (pendingPlays[src] = []);
+      q.push({ name: name, opts: opts });
+      if (q.length > 4) q.shift();
+      loadFileBuffer(src);
+      return false;
+    }
     stopFile(name);
     try {
       var node = ctx.createBufferSource();
@@ -632,7 +694,8 @@
       node.loop = !!opts.loop;
       if (opts.pitch && node.playbackRate) node.playbackRate.value = Math.max(0.01, opts.pitch);
       var g = ctx.createGain();
-      g.gain.value = clamp01(opts.volume === undefined ? 1 : opts.volume);
+      var baseGain = (soundGain[name] === undefined) ? 1 : soundGain[name];
+      g.gain.value = clamp01((opts.volume === undefined ? 1 : opts.volume) * baseGain);
       node.connect(g);
       g.connect(opts.music ? musicVol : sfxBus);
       var rec = { s: node, g: g };
@@ -660,9 +723,14 @@
   }
 
   function setFileVolume(name, v, ms) {
+    // GML's audio_sound_gain changes the sound *resource*: the value sticks and
+    // applies to every later play of that sound.  The game depends on it --
+    // EggmanBase1_23 sets the gain to 0, ramps it to 0.82 and only then starts
+    // the looping track.
+    var target = clamp01(v);
+    soundGain[name] = target;
     var list = fileGains[name];
     if (!list || !list.length) return;
-    var target = clamp01(v);
     var now = ctx.currentTime;
     var ramp = Math.max(0, num(ms, 0)) / 1000;
     for (var i = 0; i < list.length; i++) {
@@ -802,6 +870,15 @@
     if (htmlMusic) return true;        // the element owns playback now
     var buf = fileBuffers[fileMusic.src];
     if (!buf || !isReady()) return false;
+    // A synthesized track may have left the shared bus faded out; a file track
+    // must always come up at full bus level.
+    if (musicFade) {
+      try {
+        var t0 = ctx.currentTime;
+        musicFade.gain.cancelScheduledValues(t0);
+        musicFade.gain.setValueAtTime(1, t0);
+      } catch (e) { /* ignore */ }
+    }
     try {
       var node = ctx.createBufferSource();
       node.buffer = buf;
@@ -924,6 +1001,7 @@
   audio.stopMusicFile = stopFileMusic;
   audio.prefetchFile = prefetchFile;
   audio.level = level;
+  audio.warmDecode = warmDecode;
   audio.usingElement = function () { return !!htmlMusic; };
   audio.memoryState = function () {
     return { decodedBytes: decodedBytes, decodedCount: decodedOrder.length,
@@ -944,6 +1022,26 @@
   audio.isMusicFilePlaying = isMusicFilePlaying;
   audio.fileBuffers = fileBuffers;
 
+  // Live nodes, for diagnostics only (no game code uses this).
+  audio.debugNodes = function () {
+    return {
+      ctx: ctx ? { state: ctx.state, time: ctx.currentTime, rate: ctx.sampleRate } : null,
+      master: master ? master.gain.value : null,
+      musicVol: musicVol ? musicVol.gain.value : null,
+      musicFade: musicFade ? musicFade.gain.value : null,
+      analyser: !!musicAn,
+      musicNode: fileMusic.node ? { loop: fileMusic.node.loop, rate: fileMusic.node.playbackRate.value } : null,
+      musicGain: fileMusic.gain ? fileMusic.gain.gain.value : null,
+      musicSrc: fileMusic.src, musicName: fileMusic.name
+    };
+  };
+
+  audio.debugSound = function (name) {
+    var l = fileGains[name] || [];
+    return { stored: soundGain[name], live: l.map(function (g) { return g.gain.value; }),
+             playing: !!liveFiles[name] };
+  };
+
   // Everything a support report needs, in one object.
   audio.debugState = function () {
     var loading = 0, names = [];
@@ -962,6 +1060,8 @@
       musicOffset: fileMusic.offset ? +fileMusic.offset.toFixed(2) : 0,
       element: !!htmlMusic,
       level: +level().toFixed(4),
+      warm: warmActive,
+      pending: (function () { var n = 0; for (var k in pendingPlays) n += pendingPlays[k].length; return n; })(),
       lastError: lastFileError
     };
   };

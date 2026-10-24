@@ -95,40 +95,147 @@
     return im;
   };
 
-  MM.gfx.drawBackgrounds = function (ctx, room, vx, vy, foreground) {
-    var layers = room.bgLayers;
-    if (!layers || !layers.length) return;
-    for (var i = 0; i < layers.length; i++) {
+  /* --------------------------------------------------------------------- */
+  /*  GameMaker background layers (8 slots, live state)                     */
+  /* --------------------------------------------------------------------- */
+
+  var BG_SLOTS = 8;
+
+  MM.bg = MM.bg || null;
+
+  function bgInit(room) {
+    var i;
+    var S = {
+      img: [], visible: [], foreground: [], x: [], y: [],
+      hspeed: [], vspeed: [], alpha: [], blend: [],
+      htiled: [], vtiled: [], stretch: [],
+      speedX: [], speedY: [], baseX: [], baseY: [], width: [], height: []
+    };
+    for (i = 0; i < BG_SLOTS; i++) {
+      S.img[i] = null; S.visible[i] = false; S.foreground[i] = false;
+      S.x[i] = 0; S.y[i] = 0; S.hspeed[i] = 0; S.vspeed[i] = 0;
+      S.alpha[i] = 1; S.blend[i] = -1;
+      S.htiled[i] = true; S.vtiled[i] = true; S.stretch[i] = false;
+      S.speedX[i] = 0; S.speedY[i] = 0;
+      S.baseX[i] = 0; S.baseY[i] = 0; S.width[i] = 0; S.height[i] = 0;
+    }
+    var layers = (room && room.bgLayers) || [];
+    for (i = 0; i < layers.length; i++) {
       var L = layers[i];
-      if (!L || L.enabled === false) continue;
-      if (!!L.foreground !== !!foreground) continue;
-      var img = MM.bgImage(L.img);
+      if (!L) continue;
+      var k = (L.idx == null) ? i : (L.idx | 0);
+      if (k < 0 || k >= BG_SLOTS) continue;
+      S.img[k] = L.img || null;
+      S.visible[k] = !!L.enabled;
+      S.foreground[k] = !!L.foreground;
+      S.baseX[k] = num(L.x, 0);
+      S.baseY[k] = num(L.y, 0);
+      S.htiled[k] = L.tiledH !== false;
+      S.vtiled[k] = L.tiledV !== false;
+      S.stretch[k] = !!L.stretch;
+      S.speedX[k] = num(L.speedX, 0);
+      S.speedY[k] = num(L.speedY, 0);
+    }
+    S.room = room;
+    S.frame = (MM.state && MM.state.frame) || 0;
+    MM.bg = S;
+  }
+
+  // GM moves a background by its own speed every step.  The port advances on
+  // render by the number of steps that ran since the previous frame, so the
+  // scroll does not depend on who owns MM.onStep.
+  function bgTick() {
+    var S = MM.bg;
+    if (!S) return;
+    var frame = (MM.state && MM.state.frame) || 0;
+    var steps = frame - (S.frame == null ? frame : S.frame);
+    S.frame = frame;
+    if (steps < 0) steps = 0;
+    if (steps > 4) steps = 4;
+    for (var i = 0; i < BG_SLOTS; i++) {
+      if (S.hspeed[i] && steps) S.x[i] += S.hspeed[i] * steps;
+      if (S.vspeed[i] && steps) S.y[i] += S.vspeed[i] * steps;
+      if (S.img[i] && !S.width[i]) {
+        var url = S.img[i];
+        if (url && typeof url === 'object') url = url.src;
+        if (url) {
+          var im = MM.bgImage(url);
+          if (im && im.width) { S.width[i] = im.width; S.height[i] = im.height; }
+        }
+      }
+    }
+  }
+
+  MM.gfx.drawBackgrounds = function (ctx, room, vx, vy, foreground) {
+    var S = MM.bg;
+    if (!S || S.room !== room) { bgInit(room); S = MM.bg; }
+    if (!foreground) bgTick();
+    var act = MM.activeView ? MM.activeView() : null;
+    var spanW = act ? act.w : (room && room.view ? room.view.w : MM.VIEW_W);
+    var spanH = act ? act.h : (room && room.view ? room.view.h : MM.VIEW_H);
+    for (var i = 0; i < BG_SLOTS; i++) {
+      if (!S.visible[i]) continue;
+      if (!!S.foreground[i] !== !!foreground) continue;
+      var url = S.img[i];
+      if (url && typeof url === 'object') url = url.src;
+      if (!url) continue;
+      var img = MM.bgImage(url);
       if (!img || !img.width || !img.height) continue;
-      var iw = img.width, ih = img.height;
-      var scrollX = vx * num(L.speedX, 0) / 100;
-      var scrollY = vy * num(L.speedY, 0) / 100;
-      var baseX = num(L.x, 0) + num(L.xOffset, 0) - scrollX;
-      var baseY = num(L.y, 0) + num(L.yOffset, 0) - scrollY;
-      if (L.stretch) {
-        ctx.drawImage(img, baseX, baseY, room.w, room.h);
+      var alpha = num(S.alpha[i], 1);
+      if (alpha <= 0) continue;
+      var drawn = (S.blend[i] !== -1 && S.blend[i] !== undefined && S.blend[i] !== null)
+        ? bgTinted(img, S.blend[i]) : img;
+      var baseX = S.baseX[i] + S.x[i] - vx * num(S.speedX[i], 0) / 100;
+      var baseY = S.baseY[i] + S.y[i] - vy * num(S.speedY[i], 0) / 100;
+      var prevA = ctx.globalAlpha;
+      ctx.globalAlpha = Math.max(0, Math.min(1, prevA * alpha));
+      if (S.stretch[i]) {
+        ctx.drawImage(drawn, baseX, baseY, room.w, room.h);
+        ctx.globalAlpha = prevA;
         continue;
       }
-      var act = MM.activeView ? MM.activeView() : null;
-      var spanW = act ? act.w : MM.VIEW_W;
-      var spanH = act ? act.h : MM.VIEW_H;
+      var iw = img.width, ih = img.height;
       var col0 = Math.floor((vx - baseX) / iw);
       var col1 = Math.ceil((vx + spanW - baseX) / iw);
       var row0 = Math.floor((vy - baseY) / ih);
       var row1 = Math.ceil((vy + spanH - baseY) / ih);
+      // A slot that is not tiled is drawn once, wherever it sits in the room.
+      if (!S.htiled[i]) { col0 = 0; col1 = 0; }
+      if (!S.vtiled[i]) { row0 = 0; row1 = 0; }
       for (var c = col0; c <= col1; c++) {
-        if (!L.tiledH && c !== 0) continue;
         for (var r = row0; r <= row1; r++) {
-          if (!L.tiledV && r !== 0) continue;
-          ctx.drawImage(img, Math.round(baseX + c * iw), Math.round(baseY + r * ih));
+          ctx.drawImage(drawn, Math.round(baseX + c * iw), Math.round(baseY + r * ih));
         }
       }
+      ctx.globalAlpha = prevA;
     }
   };
+
+  // ---- GML access ------------------------------------------------------
+  // Returning the live arrays makes `background_visible[2] = true` work: the
+  // interpreter assigns into base[index] on whatever the getter returned.
+  (function () {
+    var V = MM.builtinVars;
+    if (!V) return;
+    V.background_visible = { get: function () { bgEnsure(); return MM.bg.visible; } };
+    V.background_foreground = { get: function () { bgEnsure(); return MM.bg.foreground; } };
+    V.background_x = { get: function () { bgEnsure(); return MM.bg.x; } };
+    V.background_y = { get: function () { bgEnsure(); return MM.bg.y; } };
+    V.background_hspeed = { get: function () { bgEnsure(); return MM.bg.hspeed; } };
+    V.background_vspeed = { get: function () { bgEnsure(); return MM.bg.vspeed; } };
+    V.background_alpha = { get: function () { bgEnsure(); return MM.bg.alpha; } };
+    V.background_blend = { get: function () { bgEnsure(); return MM.bg.blend; } };
+    V.background_htiled = { get: function () { bgEnsure(); return MM.bg.htiled; } };
+    V.background_vtiled = { get: function () { bgEnsure(); return MM.bg.vtiled; } };
+    V.background_width = { get: function () { bgEnsure(); return MM.bg.width; } };
+    V.background_height = { get: function () { bgEnsure(); return MM.bg.height; } };
+    V.background_index = { get: function () { bgEnsure(); return MM.bg.img; } };
+  })();
+
+  // The getters below make sure a room has state even if no frame was drawn yet.
+  function bgEnsure() {
+    if (!MM.bg || MM.bg.room !== MM.state.room) bgInit(MM.state.room);
+  }
 
   /* ===================================================================== */
   /*  Pixel collision masks                                                 */
@@ -581,7 +688,7 @@
   B.audio_play_sound = function (ctx, args) {
     var f = resolveSound(args[0]);
     if (!f) return 0;
-    var loop = args.length >= 3 ? num(args[2], 0) !== 0 : num(args[1], 0) !== 0;
+    var loop = args.length >= 3 ? num(args[2], 0) !== 0 : false;
     MM.audio.playFile(f.name, f.src, {
       loop: loop,
       volume: num(f.volume, 1),
@@ -634,6 +741,10 @@
   B.audio_stop_all = function (ctx, args) {
     MM.audio.stopAllFiles();
     MM.audio.stopAllSfx();
+    // GM's audio_stop_all() stops music too; the game relies on it when it
+    // switches tracks (audio_stop_all(); audio_play_music(...)).
+    MM.audio.stopMusicFile();
+    MM.audio.stopMusic();
     return 0;
   };
 
