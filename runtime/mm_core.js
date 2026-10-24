@@ -865,14 +865,15 @@
         if (inst.vspeed < 0.2) inst.vspeed = 0.2;
       }
       if (!overlapsLevelSolid(inst, inst.x, inst.y)) continue;
-      if (inst._px !== undefined && !overlapsLevelSolid(inst, inst._px, inst.y)) {
-        inst.x = inst._px;
-        MM.globals.vel = 0;
-        continue;
-      }
+      // Vertical penetration first: landing must not touch horizontal speed.
       if (inst._py !== undefined && !overlapsLevelSolid(inst, inst.x, inst._py)) {
         inst.y = inst._py;
         inst.vspeed = 0;
+        continue;
+      }
+      if (inst._px !== undefined && !overlapsLevelSolid(inst, inst._px, inst.y)) {
+        inst.x = inst._px;
+        MM.globals.vel = 0;
       }
     }
   }

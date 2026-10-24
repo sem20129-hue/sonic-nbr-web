@@ -294,10 +294,16 @@
     // player stayed a few pixels inside the floor and could not walk; with an
     // extra pixel it hovered and jittered.
     if (touchesSolid(me, me.x, me.y)) {
-      while (steps < maxDist && touchesSolid(me, me.x - dx, me.y - dy)) {
-        me.x -= dx; me.y -= dy; steps++;
+      // GM pushes the instance out of the solid; the maxdist limit applies to
+      // the forward travel, not to the escape.  Landing at speed sinks the
+      // hero several pixels into the floor and the old 4px cap left him
+      // overlapping -- which tripped the game's wall branch and zeroed the
+      // horizontal speed on every landing.
+      var escape = 0;
+      while (escape < 128 && touchesSolid(me, me.x - dx, me.y - dy)) {
+        me.x -= dx; me.y -= dy; escape++;
       }
-      if (steps < maxDist) { me.x -= dx; me.y -= dy; }
+      if (escape < 128) { me.x -= dx; me.y -= dy; }
       return 0;
     }
     // GameMaker advances in whole pixels and never exceeds maxdist, so
