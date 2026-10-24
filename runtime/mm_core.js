@@ -1263,6 +1263,16 @@
     return out;
   }
 
+  // Tiles: sub-rect of a background image, positioned in world space.  Depth
+  // decides whether the tile sits behind or in front of instances (GM sorts
+  // everything by depth), so the renderer merges these with the instances.
+  function drawRoomTile(ctx, t) {
+    var img = MM.bgImage(t.i);
+    if (!img || !img.width) return;
+    var k = t.k == null ? 1 : t.k, l = t.l == null ? 1 : t.l;
+    ctx.drawImage(img, t.sx, t.sy, t.w, t.h, t.x, t.y, t.w * k, t.h * l);
+  }
+
   function drawTileLayers(ctx, room, vx, vy) {
     var tl = room.tileLayer;
     if (!tl) return;
@@ -1351,6 +1361,16 @@
     }
     MM.state.version++;
     if (MM.startRoomPreload) MM.startRoomPreload(room);
+    // Tiles use background images as tilesets; start their loads immediately so
+    // the first rendered frame is not full of holes.
+    var rt = MM.roomTiles && MM.roomTiles[room.name];
+    if (rt) {
+      var tileSeen = {};
+      for (var ti2 = 0; ti2 < rt.length; ti2++) {
+        var tileUrl = rt[ti2].i;
+        if (tileUrl && !tileSeen[tileUrl]) { tileSeen[tileUrl] = 1; MM.bgImage(tileUrl); }
+      }
+    }
     if (MM.onRoomLoaded) MM.onRoomLoaded(room);
   };
 
@@ -1449,8 +1469,24 @@
     MM.gfxCtx = ctx;
     if (MM.gfx.drawBackgrounds) MM.gfx.drawBackgrounds(ctx, room, vx, vy, false);
     drawTileLayers(ctx, room, vx, vy);
+    var tileDraw = [];
+    var roomTiles = (MM.roomTiles && MM.roomTiles[room.name]) || null;
+    if (roomTiles) {
+      var tmg = 200;
+      for (var tq = 0; tq < roomTiles.length; tq++) {
+        var TQ = roomTiles[tq];
+        var tw = TQ.w * (TQ.k == null ? 1 : TQ.k);
+        var th = TQ.h * (TQ.l == null ? 1 : TQ.l);
+        if (TQ.x + tw < vx - tmg || TQ.x > vx + vw + tmg ||
+            TQ.y + th < vy - tmg || TQ.y > vy + vh + tmg) continue;
+        tileDraw.push(TQ);
+      }
+      tileDraw.sort(function (a, b) { return b.d - a.d; });
+    }
+    var tIdx = 0;
     for (var i = 0; i < drawables.length; i++) {
       var inst = drawables[i];
+      while (tIdx < tileDraw.length && tileDraw[tIdx].d > inst.depth) drawRoomTile(ctx, tileDraw[tIdx++]);
       if (MM.eventCode(inst.object_index, 'draw')) {
         MM.runEvent(inst, 'draw');
       } else if (inst.sprite_index) {
@@ -1462,6 +1498,7 @@
         MM.gfx.drawSelf(ctx, inst);
       }
     }
+    while (tIdx < tileDraw.length) drawRoomTile(ctx, tileDraw[tIdx++]);
     if (MM.gfx.drawBackgrounds) MM.gfx.drawBackgrounds(ctx, room, vx, vy, true);
     ctx.restore();
 
