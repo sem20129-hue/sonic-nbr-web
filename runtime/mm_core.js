@@ -55,6 +55,21 @@
   };
   MM.globals = MM.state.globals;
 
+  // Fixed-composition screens (title, language, data select, logos).  These are
+  // drawn for a 320-wide view and are not built for a wider camera, so the 16:9
+  // path keeps their original port scale and only extends the backdrop.
+  MM.STATIC_ART_ROOMS = {
+    LanguageSelect_19: 1,
+    TitleScreen_3: 1,
+    DataSelect_5: 1,
+    JKN_0: 1,
+    SEGA_2: 1
+  };
+  MM.isStaticArtRoom = function () {
+    var room = MM.state && MM.state.room;
+    return !!(room && MM.STATIC_ART_ROOMS[room.name]);
+  };
+
   // Камера/виды (как view_xview[0] и т. п. в GM)
   MM.view = {
     visible: [false, false, false, false, false, false, false, false],
@@ -92,12 +107,30 @@
       ph *= fit;
     }
     var sx = pw / vw, sy = ph / vh;
-    // Camera rooms get a real 16:9 view: widen the logical view to the screen
-    // aspect instead of showing out-of-room strips.  Static art screens keep
-    // the original 4:3 port, centred.
-    // Static screens (menus, data select): keep their 320-wide composition, but
-    // extend the visible world/background to the full 16:9 width instead of
-    // leaving black bars.  The menu itself stays centred.
+    // Menu/art screens (title, language, data select, logos): these are drawn
+    // for a fixed 320-wide composition and their backdrop art is not built for
+    // a scrolling 16:9 view.  Keep the *original* port scale so the art looks
+    // exactly like in 4:3 (same size and proportions, no extra squashing), and
+    // only widen the visible world so the sides are filled with background.
+    if (MM.aspect !== '4:3' && MM.isStaticArtRoom && MM.isStaticArtRoom()) {
+      var artW = MM.VIEW_W / sx;
+      var artEx = Math.max(0, (artW - vw) / 2);
+      return {
+        index: idx,
+        x: MM.view.xview[idx] || 0,
+        y: MM.view.yview[idx] || 0,
+        w: artW, h: vh,
+        px: 0, py: 0,
+        pw: MM.VIEW_W, ph: MM.VIEW_H,
+        sx: sx,
+        sy: sy,
+        extra: artEx
+      };
+    }
+
+    // Other rooms without a camera object (scrolling cutscenes, race room) get
+    // a real 16:9 view: widen the logical view to the screen aspect instead of
+    // leaving black bars.
     if (MM.aspect !== '4:3' && !MM.view.object[idx]) {
       var wideW = Math.max(vw, Math.round(vh * MM.VIEW_W / MM.VIEW_H));
       var wex = (wideW - vw) / 2;

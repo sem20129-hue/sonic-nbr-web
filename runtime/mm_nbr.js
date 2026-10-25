@@ -190,6 +190,16 @@
       var baseY = S.baseY[i] + S.y[i] - vy * num(S.speedY[i], 0) / 100;
       var prevA = ctx.globalAlpha;
       ctx.globalAlpha = Math.max(0, Math.min(1, prevA * alpha));
+      // Menu/art screens in 16:9: their 320-wide backdrop was tiled for a
+      // 320-wide view.  Repeating it across the wider view showed dark bands at
+      // every tile edge (the art has a soft border), so draw one copy stretched
+      // over the visible span instead.  Scrolling rooms are untouched.
+      if (ex > 0 && MM.isStaticArtRoom && MM.isStaticArtRoom()) {
+        ctx.drawImage(drawn, Math.round(vx - ex), Math.round(vy),
+          Math.round(act.w), Math.round(act.h));
+        ctx.globalAlpha = prevA;
+        continue;
+      }
       if (S.stretch[i]) {
         ctx.drawImage(drawn, baseX, baseY, room.w, room.h);
         ctx.globalAlpha = prevA;
