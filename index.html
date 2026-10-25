@@ -5,6 +5,28 @@
 <link rel="icon" href="data:,">
 <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
 <title>Sonic.exe: Nightmare Beginning Remake — Unofficial Browser Fan Project</title>
+<script>
+// Build sync: a stale cached index is the usual "works for him, not for me"
+// case.  Ask the server for the current stamp and reload once onto it.
+(function () {
+  var cur = '20261025152739';
+  if (!cur || cur.charAt(0) === '_') return;
+  try {
+    var x = new XMLHttpRequest();
+    x.open('GET', 'version.json?t=' + Date.now(), false);
+    x.send(null);
+    if (x.status >= 200 && x.status < 300) {
+      var srv = JSON.parse(x.responseText).v;
+      if (srv && srv !== cur) {
+        var rk = 'nbr.build.' + cur;
+        var tried = false;
+        try { tried = sessionStorage.getItem(rk) === '1'; sessionStorage.setItem(rk, '1'); } catch (e2) {}
+        if (!tried) location.replace('index.html?t=' + Date.now());
+      }
+    }
+  } catch (e) { /* offline / dev server: keep this build */ }
+})();
+</script>
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; }
@@ -154,24 +176,24 @@
 </script>
 
 <!-- runtime -->
-<script src="runtime/mm_core.js?v=20261025152256"></script>
-<script src="runtime/mm_interp.js?v=20261025152256"></script>
-<script src="runtime/mm_builtins.js?v=20261025152256"></script>
-<script src="runtime/mm_audio.js?v=20261025152256"></script>
-<script src="runtime/mm_nbr.js?v=20261025152256"></script>
-<script src="runtime/mm_fanending.js?v=20261025152256"></script>
+<script src="runtime/mm_core.js?v=20261025152739"></script>
+<script src="runtime/mm_interp.js?v=20261025152739"></script>
+<script src="runtime/mm_builtins.js?v=20261025152739"></script>
+<script src="runtime/mm_audio.js?v=20261025152739"></script>
+<script src="runtime/mm_nbr.js?v=20261025152739"></script>
+<script src="runtime/mm_fanending.js?v=20261025152739"></script>
 
 <!-- generated game package -->
-<script src="game/code.js?v=20261025152256"></script>
-<script src="game/sprites.js?v=20261025152256"></script>
-<script src="game/objects.js?v=20261025152256"></script>
-<script src="game/asset_ids.js?v=20261025152256"></script>
-<script src="game/rooms.js?v=20261025152256"></script>
-<script src="game/scripts.js?v=20261025152256"></script>
-<script src="game/sounds.js?v=20261025152256"></script>
-<script src="game/fonts.js?v=20261025152256"></script>
-<script src="game/assets.js?v=20261025152256"></script>
-<script src="game/tiles.js?v=20261025152256"></script>
+<script src="game/code.js?v=20261025152739"></script>
+<script src="game/sprites.js?v=20261025152739"></script>
+<script src="game/objects.js?v=20261025152739"></script>
+<script src="game/asset_ids.js?v=20261025152739"></script>
+<script src="game/rooms.js?v=20261025152739"></script>
+<script src="game/scripts.js?v=20261025152739"></script>
+<script src="game/sounds.js?v=20261025152739"></script>
+<script src="game/fonts.js?v=20261025152739"></script>
+<script src="game/assets.js?v=20261025152739"></script>
+<script src="game/tiles.js?v=20261025152739"></script>
 
 <script>
 (function () {
