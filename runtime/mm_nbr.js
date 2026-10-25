@@ -1430,6 +1430,17 @@
     phase = phase || 'all';
     var bootSet = phase === 'boot' ? bootSpriteSet() : null;
 
+    // Background pass: masks first (precise collisions matter more than the
+    // remaining artwork), then sprites and audio.
+    if (phase === 'rest') {
+      for (n in MM.sprites) {
+        d = MM.sprites[n];
+        if (!d || !d.mask || seen['m' + d.mask]) continue;
+        seen['m' + d.mask] = 1;
+        jobs.push({ kind: 'mask', src: d.mask });
+      }
+    }
+
     // 1. sprite frames (phase 'rest' only fills what is still missing)
     for (n in MM.sprites) {
       d = MM.sprites[n];
@@ -1443,8 +1454,8 @@
       }
     }
 
-    // 2. pixel masks (needed for precise collisions; cheap files)
-    if (phase !== 'rest') {
+    // 2. pixel masks (kept out of the fast boot and already queued first in rest)
+    if (phase !== 'boot' && phase !== 'rest') {
       for (n in MM.sprites) {
         d = MM.sprites[n];
         if (!d || !d.mask || seen['m' + d.mask]) continue;
