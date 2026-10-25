@@ -1445,15 +1445,9 @@
       jobs.push({ kind: 'font', src: fnt.src, obj: fnt });
     }
 
-    // 5. audio: only the common effects/music stingers are prefetched.  Pulling
-    // all 65 MB of voice/music bytes up front was heavy enough to stall weak
-    // machines; rare tracks now load on demand (and still play fine).
+    // 5. audio: every sound is prefetched up front (full preload)
     var sounds = MM.soundFiles || {};
-    var only = Object.create(null);
-    var common = MM.PRELOAD_SOUNDS || [];
-    for (n = 0; n < common.length; n++) only[common[n]] = 1;
     for (n in sounds) {
-      if (!only[n]) continue;
       var def = sounds[n];
       if (!def || !def.src || seen['s' + def.src]) continue;
       seen['s' + def.src] = 1;
@@ -1537,16 +1531,9 @@
               .catch(function () { once(false); });
           }
         } else if (job.kind === 'img') {
-          ensureFrame(job.obj, function () {
-            var ok = !!job.obj.img;
-            // Full loading pass: the file is now in the browser cache, but the
-            // decoded bitmap is released so 2600 frames do not keep ~300 MB
-            // resident and freeze weaker machines.  Reset _tried so the frame
-            // can be re-created from the cache on first draw.
-            job.obj.img = null;
-            job.obj._tried = false;
-            once(ok);
-          });
+          // Full preload: keep the decoded frame resident so nothing has to be
+          // fetched or decoded during play.
+          ensureFrame(job.obj, function () { once(!!job.obj.img); });
         } else if (job.kind === 'mask') {
           maskData(job.src, function (ok) { once(ok); });
         } else if (job.kind === 'bg') {
