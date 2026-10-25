@@ -9,7 +9,7 @@
 // Build sync: a stale cached index is the usual "works for him, not for me"
 // case.  Ask the server for the current stamp and reload once onto it.
 (function () {
-  var cur = '20261025152739';
+  var cur = '20261025153100';
   if (!cur || cur.charAt(0) === '_') return;
   try {
     var x = new XMLHttpRequest();
@@ -101,6 +101,17 @@
     font-size: 11px; color: rgba(255,255,255,.42);
     pointer-events: none; text-shadow: 0 1px 0 #000;
   }
+  #boot {
+    position: fixed; inset: 0; z-index: 100000;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: #050509; color: #d8d8e4; font: 14px Consolas, monospace;
+    transition: opacity .25s linear;
+  }
+  #boot.done { opacity: 0; pointer-events: none; }
+  #boot .t { margin-bottom: 12px; color: #ffcf55; letter-spacing: .08em; }
+  #boot .bar { width: min(420px, 70vw); height: 10px; background: #14141e; border: 1px solid #34344a; border-radius: 5px; overflow: hidden; }
+  #boot .bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg,#ff4d4d,#ffe27a); transition: width .12s linear; }
+  #boot .n { margin-top: 10px; color: #8d8da2; font-size: 12px; }
   .keys { font-size: 12px; color: #55556a; }
   kbd {
     background: #1b1b26; border: 1px solid #33334a; border-bottom-width: 2px;
@@ -125,6 +136,7 @@
 </style>
 </head>
 <body>
+<div id="boot"><div class="t">ЗАГРУЗКА ИГРЫ</div><div class="bar"><i></i></div><div class="n">0 / 0</div></div>
 <div id="wrap">
   <div id="stage">
     <canvas id="game" width="854" height="480" tabindex="0"></canvas>
@@ -176,24 +188,24 @@
 </script>
 
 <!-- runtime -->
-<script src="runtime/mm_core.js?v=20261025152739"></script>
-<script src="runtime/mm_interp.js?v=20261025152739"></script>
-<script src="runtime/mm_builtins.js?v=20261025152739"></script>
-<script src="runtime/mm_audio.js?v=20261025152739"></script>
-<script src="runtime/mm_nbr.js?v=20261025152739"></script>
-<script src="runtime/mm_fanending.js?v=20261025152739"></script>
+<script src="runtime/mm_core.js?v=20261025153100"></script>
+<script src="runtime/mm_interp.js?v=20261025153100"></script>
+<script src="runtime/mm_builtins.js?v=20261025153100"></script>
+<script src="runtime/mm_audio.js?v=20261025153100"></script>
+<script src="runtime/mm_nbr.js?v=20261025153100"></script>
+<script src="runtime/mm_fanending.js?v=20261025153100"></script>
 
 <!-- generated game package -->
-<script src="game/code.js?v=20261025152739"></script>
-<script src="game/sprites.js?v=20261025152739"></script>
-<script src="game/objects.js?v=20261025152739"></script>
-<script src="game/asset_ids.js?v=20261025152739"></script>
-<script src="game/rooms.js?v=20261025152739"></script>
-<script src="game/scripts.js?v=20261025152739"></script>
-<script src="game/sounds.js?v=20261025152739"></script>
-<script src="game/fonts.js?v=20261025152739"></script>
-<script src="game/assets.js?v=20261025152739"></script>
-<script src="game/tiles.js?v=20261025152739"></script>
+<script src="game/code.js?v=20261025153100"></script>
+<script src="game/sprites.js?v=20261025153100"></script>
+<script src="game/objects.js?v=20261025153100"></script>
+<script src="game/asset_ids.js?v=20261025153100"></script>
+<script src="game/rooms.js?v=20261025153100"></script>
+<script src="game/scripts.js?v=20261025153100"></script>
+<script src="game/sounds.js?v=20261025153100"></script>
+<script src="game/fonts.js?v=20261025153100"></script>
+<script src="game/assets.js?v=20261025153100"></script>
+<script src="game/tiles.js?v=20261025153100"></script>
 
 <script>
 (function () {
@@ -335,6 +347,24 @@
   var prebar = document.querySelector('#prebar i');
   var pretext = document.getElementById('pretext');
   var hint = document.getElementById('hint');
+  var bootEl = document.getElementById('boot');
+  var bootBar = bootEl ? bootEl.querySelector('.bar i') : null;
+  var bootText = bootEl ? bootEl.querySelector('.n') : null;
+  var bootStart = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+  var bootHidden = false;
+  function bootUpdate(done, total, failed) {
+    if (!bootEl) return;
+    var pct = total ? Math.min(100, Math.floor(done * 100 / total)) : 0;
+    if (bootBar) bootBar.style.width = pct + '%';
+    if (bootText) bootText.textContent = done + ' / ' + total + ' · ' + pct + '%' + (failed ? ' · ошибок: ' + failed : '');
+  }
+  function bootHide() {
+    if (!bootEl || bootHidden) return;
+    bootHidden = true;
+    var now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+    var wait = Math.max(0, 1500 - (now - bootStart));
+    setTimeout(function () { bootEl.classList.add('done'); }, wait);
+  }
   var ready = false;
   if (MM.state) MM.state.paused = true;
 
@@ -345,6 +375,7 @@
     onProgress: function (p) {
       if (!p.total) return;
       var pct = Math.floor(p.done * 100 / p.total);
+      bootUpdate(p.done, p.total, p.failed);
       prebar.style.width = pct + '%';
       var bytes = (MM.audio && MM.audio.preloadedBytes) ? MM.audio.preloadedBytes() : null;
       pretext.textContent = 'Загрузка ' + p.done + ' / ' + p.total + ' · ' + pct + '%' +
@@ -357,6 +388,8 @@
       pretext.textContent = 'Всё загружено' + (r && r.failed ? ' (кроме ' + r.failed + ' файлов)' : '');
       hint.className = 'ready';
       hint.textContent = 'Нажми, чтобы включить звук и начать';
+      if (bootText) bootText.textContent = 'Всё загружено: ' + (r && r.total ? r.total : '') + ' ассетов';
+      bootHide();
       // Audio decoding starts only after the user gesture (start()), not while
       // the loading screen is still visible: decoding everything there froze
       // slower machines before the game even began.
@@ -435,6 +468,7 @@
     if (MM.audio && MM.audio.warmDecode) MM.audio.warmDecode();
     if (MM.state) MM.state.paused = false;
     canvas.focus();
+    bootHide();
   }
   overlay.addEventListener('click', start);
   // Clicking anywhere on the game also focuses it and un-pauses if a stale
@@ -445,7 +479,7 @@
     if (ready && MM.state && MM.state.paused) MM.state.paused = false;
   });
   window.addEventListener('keydown', function (e) {
-    if (!overlay.classList.contains('hidden')) start();
+    if (!overlay.classList.contains('hidden') && (e.keyCode === 13 || e.keyCode === 32)) start();
   }, { once: false });
 
   // Any later gesture also retries the unlock: some mobile browsers ignore
