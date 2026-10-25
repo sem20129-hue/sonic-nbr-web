@@ -1445,9 +1445,15 @@
       jobs.push({ kind: 'font', src: fnt.src, obj: fnt });
     }
 
-    // 5. audio: bytes only, decoded on first play
+    // 5. audio: only the common effects/music stingers are prefetched.  Pulling
+    // all 65 MB of voice/music bytes up front was heavy enough to stall weak
+    // machines; rare tracks now load on demand (and still play fine).
     var sounds = MM.soundFiles || {};
+    var only = Object.create(null);
+    var common = MM.PRELOAD_SOUNDS || [];
+    for (n = 0; n < common.length; n++) only[common[n]] = 1;
     for (n in sounds) {
+      if (!only[n]) continue;
       var def = sounds[n];
       if (!def || !def.src || seen['s' + def.src]) continue;
       seen['s' + def.src] = 1;
