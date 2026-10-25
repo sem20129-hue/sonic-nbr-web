@@ -1873,7 +1873,11 @@
       var key = 'gml_Object_SW_Draw_0';
       var sw = b[key];
       if (typeof sw === 'string' && sw.indexOf('// wide fixed') < 0) {
-        b[key] = sw.replace(/view_xview\[0\]/g, '(view_xview[0] + ' + off + ')') + '\n// wide fixed';
+        // The dialogue panel sprite is 380 px wide (portrait + text + "Enter"),
+        // wider than the 320-px view it was authored for.  Centre that width in
+        // the wide view instead of centring 320, otherwise the panel runs off
+        // the right edge and the "Enter" tab gets cut.
+        b[key] = sw.replace(/view_xview\[0\]/g, '(view_xview[0] + (global.HUD_Dlg || 0))') + '\n// wide fixed';
       }
       // Metal Sonic / Exetior entrance: the spawn was x +-200, which was just
       // off-screen in a 320-wide view but inside the 463-wide one (pop-in).

@@ -107,11 +107,9 @@
       ph *= fit;
     }
     var sx = pw / vw, sy = ph / vh;
-    // Menu/art screens (title, language, data select, logos): these are drawn
-    // for a fixed 320-wide composition and their backdrop art is not built for
-    // a scrolling 16:9 view.  Keep the *original* port scale so the art looks
-    // exactly like in 4:3 (same size and proportions, no extra squashing), and
-    // only widen the visible world so the sides are filled with background.
+    // Camera rooms get a wider logical view (fills 16:9 with real level/art
+    // instead of bars).  Static art screens keep their authored 320-wide
+    // composition and only extend the backdrop.
     if (MM.aspect !== '4:3' && MM.isStaticArtRoom && MM.isStaticArtRoom()) {
       var artW = MM.VIEW_W / sx;
       var artEx = Math.max(0, (artW - vw) / 2);
@@ -122,18 +120,13 @@
         w: artW, h: vh,
         px: 0, py: 0,
         pw: MM.VIEW_W, ph: MM.VIEW_H,
-        sx: sx,
-        sy: sy,
+        sx: sx, sy: sy,
         extra: artEx
       };
     }
-
-    // Other rooms without a camera object (scrolling cutscenes, race room) get
-    // a real 16:9 view: widen the logical view to the screen aspect instead of
-    // leaving black bars.
-    if (MM.aspect !== '4:3' && !MM.view.object[idx]) {
+    if (MM.aspect !== '4:3') {
       var wideW = Math.max(vw, Math.round(vh * MM.VIEW_W / MM.VIEW_H));
-      var wex = (wideW - vw) / 2;
+      var wex = Math.max(0, (wideW - vw) / 2);
       return {
         index: idx,
         x: MM.view.xview[idx] || 0,
@@ -143,21 +136,7 @@
         pw: MM.VIEW_W, ph: MM.VIEW_H,
         sx: MM.VIEW_W / wideW,
         sy: MM.VIEW_H / vh,
-        extra: wex > 0 ? wex : 0
-      };
-    }
-
-    if (MM.aspect !== '4:3' && MM.view.object[idx]) {
-      return {
-        index: idx,
-        x: MM.view.xview[idx] || 0,
-        y: MM.view.yview[idx] || 0,
-        w: vw, h: vh,
-        px: 0, py: 0,
-        pw: MM.VIEW_W, ph: MM.VIEW_H,
-        sx: MM.VIEW_W / vw,
-        sy: MM.VIEW_H / vh,
-        extra: 0
+        extra: wex
       };
     }
     return {
@@ -1500,9 +1479,8 @@
       MM.view.visible[i] = !!(v.enabled === undefined ? true : v.enabled);
       MM.view.wview[i] = v.w || MM.VIEW_W;
       MM.view.hview[i] = v.h || MM.VIEW_H;
-      // 16:9: a camera view uses the full screen width.  Widening the logical
-      // view (instead of showing strips outside the room) keeps backgrounds,
-      // tiles and the camera clamp seamless.
+      // 16:9: a camera view uses the full screen width, so the level is shown
+      // wider instead of leaving strips outside the room.
       if (v.object && MM.aspect !== '4:3') {
         var wide = Math.round(MM.view.hview[i] * MM.VIEW_W / MM.VIEW_H);
         if (wide > MM.view.wview[i]) MM.view.wview[i] = wide;
@@ -1812,7 +1790,8 @@
     ctx.restore();
   }
 
-  MM.renderFrame = function () {    var ctx = MM.ctx;
+  MM.renderFrame = function () {
+    var ctx = MM.ctx;
     if (!ctx) return;
     var room = MM.state.room;
     if (!room) return;
@@ -1841,6 +1820,9 @@
     // anchors so they sit on the real screen corners in every mode.
     if (!MM.globals) MM.globals = {};
     MM.globals.HUD_Wide = view.w;
+    // Dialogue panels (SW) are 380 px wide, wider than the 320-px frame they
+    // were authored for: centre that width so the "Enter" tab is never cut.
+    MM.globals.HUD_Dlg = Math.max(0, (view.w - 380) / 2);
     var sx = Math.round(MM.fx.shakeX), sy = Math.round(MM.fx.shakeY);
     var drawables = MM.state.instances
       .filter(function (i) { return !i._destroyed && !i._deactivated && i.visible; })
@@ -1941,6 +1923,7 @@
       ctx.globalAlpha = 1;
     }
     if (MM.onDraw) MM.onDraw(ctx, W, H);
+
   };
 
   // -------------------------------------------------------------------
