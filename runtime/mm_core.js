@@ -1747,7 +1747,10 @@
     // Extend the outer pixels of the backdrop into the margins so the picture
     // continues to the screen edge instead of stopping mid-screen.
     var spr = inst.sprite_index;
-    if (!spr || !spr.frames || inst.depth < 100) return;
+    if (!spr || !spr.frames) return;
+    // Gameplay: only real backdrop layers (they sit behind everything).  Menu /
+    // title screens are a single composition, so any wide art there counts.
+    if (inst.depth < 100 && !(MM.isStaticArtRoom && MM.isStaticArtRoom())) return;
     if ((inst.image_angle || 0) !== 0) return;
     if (Math.abs(inst.image_xscale) !== 1 || Math.abs(inst.image_yscale) !== 1) return;
     var av = MM.activeView();
