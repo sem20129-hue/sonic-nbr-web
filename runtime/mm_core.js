@@ -1829,12 +1829,20 @@
         last = (typeof performance !== 'undefined' ? performance.now() : Date.now());
         acc = 0;
       };
+      // Returning to the tab: reset the clock and try to wake the audio device
+      // (browsers suspend the AudioContext while the page is hidden).
+      var wake = function () {
+        syncClock();
+        try { if (MM.audio && MM.audio.unlock) MM.audio.unlock(); } catch (e) { /* ignore */ }
+      };
       if (typeof document !== 'undefined' && document.addEventListener) {
-        document.addEventListener('visibilitychange', syncClock);
+        document.addEventListener('visibilitychange', function () {
+          if (typeof document.hidden !== 'undefined' && document.hidden) syncClock(); else wake();
+        });
       }
       if (typeof window !== 'undefined' && window.addEventListener) {
         window.addEventListener('blur', syncClock);
-        window.addEventListener('focus', syncClock);
+        window.addEventListener('focus', wake);
       }
       var loop = function (t) {
         if (!MM.state.running) return;
