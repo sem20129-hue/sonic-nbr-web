@@ -135,24 +135,24 @@
 </script>
 
 <!-- runtime -->
-<script src="runtime/mm_core.js?v=202610250934"></script>
-<script src="runtime/mm_interp.js?v=202610250934"></script>
-<script src="runtime/mm_builtins.js?v=202610250934"></script>
-<script src="runtime/mm_audio.js?v=202610250934"></script>
-<script src="runtime/mm_nbr.js?v=202610250934"></script>
-<script src="runtime/mm_fanending.js?v=202610250934"></script>
+<script src="runtime/mm_core.js?v=202610250947"></script>
+<script src="runtime/mm_interp.js?v=202610250947"></script>
+<script src="runtime/mm_builtins.js?v=202610250947"></script>
+<script src="runtime/mm_audio.js?v=202610250947"></script>
+<script src="runtime/mm_nbr.js?v=202610250947"></script>
+<script src="runtime/mm_fanending.js?v=202610250947"></script>
 
 <!-- generated game package -->
-<script src="game/code.js?v=202610250934"></script>
-<script src="game/sprites.js?v=202610250934"></script>
-<script src="game/objects.js?v=202610250934"></script>
-<script src="game/asset_ids.js?v=202610250934"></script>
-<script src="game/rooms.js?v=202610250934"></script>
-<script src="game/scripts.js?v=202610250934"></script>
-<script src="game/sounds.js?v=202610250934"></script>
-<script src="game/fonts.js?v=202610250934"></script>
-<script src="game/assets.js?v=202610250934"></script>
-<script src="game/tiles.js?v=202610250934"></script>
+<script src="game/code.js?v=202610250947"></script>
+<script src="game/sprites.js?v=202610250947"></script>
+<script src="game/objects.js?v=202610250947"></script>
+<script src="game/asset_ids.js?v=202610250947"></script>
+<script src="game/rooms.js?v=202610250947"></script>
+<script src="game/scripts.js?v=202610250947"></script>
+<script src="game/sounds.js?v=202610250947"></script>
+<script src="game/fonts.js?v=202610250947"></script>
+<script src="game/assets.js?v=202610250947"></script>
+<script src="game/tiles.js?v=202610250947"></script>
 
 <script>
 (function () {
@@ -286,7 +286,18 @@
         if (st.element) audio += ' (поток)';
       }
     }
-    hud.textContent = MM.state.room.name + ' · ' + MM.state.frame + audio;
+    var pos = '';
+    var hero = null;
+    for (var i = 0; i < MM.state.instances.length; i++) {
+      var inst = MM.state.instances[i];
+      if (!inst._destroyed && (inst.object_name === 'Tails' || inst.object_name === 'Knuckles' ||
+          inst.object_name === 'Sonic' || inst.object_name === 'Eggman' || inst.object_name === 'ExetiorRace')) {
+        hero = inst;
+        break;
+      }
+    }
+    if (hero) pos = ' · x' + Math.round(hero.x) + ' y' + Math.round(hero.y);
+    hud.textContent = MM.state.room.name + ' · ' + MM.state.frame + pos + audio;
   }, 250);
 
   // --- audio unlock + start --------------------------------------------

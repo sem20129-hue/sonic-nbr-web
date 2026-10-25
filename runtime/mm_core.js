@@ -918,6 +918,25 @@
         MM.globals.vel = 0;
       }
     }
+    // A hero resting exactly against a wall (inclusive boxes) makes the game's
+    // ceiling probe touch that wall and cancels every jump.  Keep a one pixel
+    // side clearance, like GM's movement look-ahead does.
+    for (var j = 0; j < list.length; j++) {
+      var p = list[j];
+      if (p._destroyed || p._deactivated || !isPlayerInst(p)) continue;
+      var pb = MM.bbox(p);
+      if (!pb) continue;
+      var solids = MM.levelSolids();
+      for (var k = 0; k < solids.length; k++) {
+        var o = solids[k];
+        if (o === p || o._destroyed || o._deactivated) continue;
+        var ob = MM.bbox(o);
+        if (!ob) continue;
+        if (pb.t >= ob.b || pb.b <= ob.t) continue; // no vertical overlap
+        if (pb.r === ob.l) { p.x -= 1; MM.globals.vel = 0; break; }
+        if (pb.l === ob.r) { p.x += 1; MM.globals.vel = 0; break; }
+      }
+    }
   }
 
   function tickCollisions() {
