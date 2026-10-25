@@ -1974,6 +1974,7 @@
       var lastLoop = 0;
       var drive = function (t) {
         if (!MM.state.running) return;
+        if (MM.state.paused) { last = t; acc = 0; return; }
         lastLoop = t;
         var dt = t - last; last = t;
         if (!(dt > 0) || dt > 250) dt = stepMs;

@@ -6,25 +6,26 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
 <title>Sonic.exe: Nightmare Beginning Remake — Unofficial Browser Fan Project</title>
 <script>
-// Build sync: a stale cached index is the usual "works for him, not for me"
-// case.  Ask the server for the current stamp and reload once onto it.
+// Build sync: ask the server for the current stamp without blocking the page
+// (a synchronous request could hang the loader on a slow CDN).
 (function () {
-  var cur = '20261025153742';
+  var cur = '20261025154230';
   if (!cur || cur.charAt(0) === '_') return;
   try {
-    var x = new XMLHttpRequest();
-    x.open('GET', 'version.json?t=' + Date.now(), false);
-    x.send(null);
-    if (x.status >= 200 && x.status < 300) {
-      var srv = JSON.parse(x.responseText).v;
-      if (srv && srv !== cur) {
-        var rk = 'nbr.build.' + cur;
-        var tried = false;
+    var ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    var timer = ctl ? setTimeout(function () { ctl.abort(); }, 3000) : null;
+    fetch('version.json?t=' + Date.now(), { cache: 'no-store', signal: ctl ? ctl.signal : undefined })
+      .then(function (r) { if (!r.ok) throw 0; return r.json(); })
+      .then(function (d) {
+        if (timer) clearTimeout(timer);
+        var srv = d && d.v;
+        if (!srv || srv === cur) return;
+        var rk = 'nbr.build.' + cur, tried = false;
         try { tried = sessionStorage.getItem(rk) === '1'; sessionStorage.setItem(rk, '1'); } catch (e2) {}
         if (!tried) location.replace('index.html?t=' + Date.now());
-      }
-    }
-  } catch (e) { /* offline / dev server: keep this build */ }
+      })
+      .catch(function () { if (timer) clearTimeout(timer); });
+  } catch (e) { /* dev/offline: keep this build */ }
 })();
 </script>
 <style>
@@ -188,24 +189,24 @@
 </script>
 
 <!-- runtime -->
-<script src="runtime/mm_core.js?v=20261025153742"></script>
-<script src="runtime/mm_interp.js?v=20261025153742"></script>
-<script src="runtime/mm_builtins.js?v=20261025153742"></script>
-<script src="runtime/mm_audio.js?v=20261025153742"></script>
-<script src="runtime/mm_nbr.js?v=20261025153742"></script>
-<script src="runtime/mm_fanending.js?v=20261025153742"></script>
+<script src="runtime/mm_core.js?v=20261025154230"></script>
+<script src="runtime/mm_interp.js?v=20261025154230"></script>
+<script src="runtime/mm_builtins.js?v=20261025154230"></script>
+<script src="runtime/mm_audio.js?v=20261025154230"></script>
+<script src="runtime/mm_nbr.js?v=20261025154230"></script>
+<script src="runtime/mm_fanending.js?v=20261025154230"></script>
 
 <!-- generated game package -->
-<script src="game/code.js?v=20261025153742"></script>
-<script src="game/sprites.js?v=20261025153742"></script>
-<script src="game/objects.js?v=20261025153742"></script>
-<script src="game/asset_ids.js?v=20261025153742"></script>
-<script src="game/rooms.js?v=20261025153742"></script>
-<script src="game/scripts.js?v=20261025153742"></script>
-<script src="game/sounds.js?v=20261025153742"></script>
-<script src="game/fonts.js?v=20261025153742"></script>
-<script src="game/assets.js?v=20261025153742"></script>
-<script src="game/tiles.js?v=20261025153742"></script>
+<script src="game/code.js?v=20261025154230"></script>
+<script src="game/sprites.js?v=20261025154230"></script>
+<script src="game/objects.js?v=20261025154230"></script>
+<script src="game/asset_ids.js?v=20261025154230"></script>
+<script src="game/rooms.js?v=20261025154230"></script>
+<script src="game/scripts.js?v=20261025154230"></script>
+<script src="game/sounds.js?v=20261025154230"></script>
+<script src="game/fonts.js?v=20261025154230"></script>
+<script src="game/assets.js?v=20261025154230"></script>
+<script src="game/tiles.js?v=20261025154230"></script>
 
 <script>
 (function () {
@@ -389,7 +390,7 @@
       pretext.textContent = 'Быстрый старт готов' + (r && r.failed ? ' (кроме ' + r.failed + ' файлов)' : '');
       hint.className = 'ready';
       hint.textContent = 'Нажми, чтобы включить звук и начать';
-      if (bootText) bootText.textContent = 'Быстрый старт готов: ' + (r && r.total ? r.total : '') + ' ассетов';
+      if (bootText) bootText.textContent = 'Быстрый старт готов: ' + (r && r.total ? r.total : '') + ' ассетов' + (MM.preloadMs ? ' · ' + (MM.preloadMs / 1000).toFixed(1) + ' с' : '');
       bootHide();
       // Everything else (the other rooms' sprites and long audio) streams in
       // the background while the menus/intro play; it never blocks the game.

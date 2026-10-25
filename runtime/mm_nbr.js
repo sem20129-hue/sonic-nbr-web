@@ -1475,19 +1475,15 @@
       }
     }
 
-    // 5. audio: boot gets the common stingers, background pass gets the rest
-    var sounds = MM.soundFiles || {};
-    var common = Object.create(null);
-    if (phase === 'boot') {
-      var cl = MM.PRELOAD_SOUNDS || [];
-      for (i = 0; i < cl.length; i++) common[cl[i]] = 1;
-    }
-    for (n in sounds) {
-      if (phase === 'boot' && !common[n]) continue;
-      var def = sounds[n];
-      if (!def || !def.src || seen['s' + def.src]) continue;
-      seen['s' + def.src] = 1;
-      jobs.push({ kind: 'snd', src: def.src });
+    // 5. audio: kept out of the fast boot, streamed by the background pass
+    if (phase !== 'boot') {
+      var sounds = MM.soundFiles || {};
+      for (n in sounds) {
+        var def = sounds[n];
+        if (!def || !def.src || seen['s' + def.src]) continue;
+        seen['s' + def.src] = 1;
+        jobs.push({ kind: 'snd', src: def.src });
+      }
     }
 
     return jobs;
@@ -1515,6 +1511,7 @@
 
     var jobs = collectPreloadJobs(phase);
     var total = jobs.length;
+    var startedAt = Date.now();
     var width = Math.max(1, Math.min(8, opts.concurrency || 8));
     var next = 0, done = 0, failed = 0, finishedFlag = false;
 
@@ -1526,6 +1523,7 @@
       finishedFlag = true;
       if (phase !== 'rest') MM.preloadedAll = true;
       else MM.backgroundLoaded = true;
+      MM.preloadMs = Date.now() - startedAt;
       MM.preloadStats.finished = true;
       var list = preloadQueue || [];
       preloadQueue = null;
