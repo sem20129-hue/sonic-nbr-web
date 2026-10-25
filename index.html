@@ -145,24 +145,24 @@
 </script>
 
 <!-- runtime -->
-<script src="runtime/mm_core.js?v=202610251401"></script>
-<script src="runtime/mm_interp.js?v=202610251401"></script>
-<script src="runtime/mm_builtins.js?v=202610251401"></script>
-<script src="runtime/mm_audio.js?v=202610251401"></script>
-<script src="runtime/mm_nbr.js?v=202610251401"></script>
-<script src="runtime/mm_fanending.js?v=202610251401"></script>
+<script src="runtime/mm_core.js?v=202610251422"></script>
+<script src="runtime/mm_interp.js?v=202610251422"></script>
+<script src="runtime/mm_builtins.js?v=202610251422"></script>
+<script src="runtime/mm_audio.js?v=202610251422"></script>
+<script src="runtime/mm_nbr.js?v=202610251422"></script>
+<script src="runtime/mm_fanending.js?v=202610251422"></script>
 
 <!-- generated game package -->
-<script src="game/code.js?v=202610251401"></script>
-<script src="game/sprites.js?v=202610251401"></script>
-<script src="game/objects.js?v=202610251401"></script>
-<script src="game/asset_ids.js?v=202610251401"></script>
-<script src="game/rooms.js?v=202610251401"></script>
-<script src="game/scripts.js?v=202610251401"></script>
-<script src="game/sounds.js?v=202610251401"></script>
-<script src="game/fonts.js?v=202610251401"></script>
-<script src="game/assets.js?v=202610251401"></script>
-<script src="game/tiles.js?v=202610251401"></script>
+<script src="game/code.js?v=202610251422"></script>
+<script src="game/sprites.js?v=202610251422"></script>
+<script src="game/objects.js?v=202610251422"></script>
+<script src="game/asset_ids.js?v=202610251422"></script>
+<script src="game/rooms.js?v=202610251422"></script>
+<script src="game/scripts.js?v=202610251422"></script>
+<script src="game/sounds.js?v=202610251422"></script>
+<script src="game/fonts.js?v=202610251422"></script>
+<script src="game/assets.js?v=202610251422"></script>
+<script src="game/tiles.js?v=202610251422"></script>
 
 <script>
 (function () {
@@ -172,6 +172,14 @@
   var overlay = document.getElementById('overlay');
   var bar = document.getElementById('bar');
   var hud = document.getElementById('hud');
+  var BUILD = (function () {
+    var s = document.querySelector('script[src*="mm_core.js"]');
+    var m = s && /v=(\d{12})/.exec(s.src);
+    return m ? m[1] : 'dev';
+  })();
+  window.addEventListener('error', function (e) {
+    if (window.MM && !MM._loopErr) MM._loopErr = String(e.message || e.error || 'js error');
+  });
 
   // --- integer scaling -------------------------------------------------
   function isFs() {
@@ -338,7 +346,8 @@
       }
     }
     if (hero) pos = ' · x' + Math.round(hero.x) + ' y' + Math.round(hero.y);
-    hud.textContent = MM.state.room.name + ' · ' + MM.state.frame + pos + audio;
+    var err = (MM._loopErr ? ' · ОШИБКА: ' + MM._loopErr : '');
+    hud.textContent = MM.state.room.name + ' · ' + MM.state.frame + pos + audio + ' · сборка ' + BUILD + err;
   }, 250);
 
   // --- audio unlock + start --------------------------------------------
