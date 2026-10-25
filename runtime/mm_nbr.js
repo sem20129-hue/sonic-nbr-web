@@ -1407,7 +1407,9 @@
   function collectPreloadJobs() {
     var jobs = [], seen = Object.create(null), n, d, i, f;
 
-    // 1. every sprite frame
+    // 1. every sprite frame: warm the HTTP cache only.  Keeping 2600+ decoded
+    // Image objects cost ~300 MB of RGBA and froze low-memory machines; the
+    // frames now load from the (already warm) cache on first use.
     for (n in MM.sprites) {
       d = MM.sprites[n];
       if (!d || d.kind !== 'image' || !d.frames) continue;
@@ -1415,7 +1417,7 @@
         f = d.frames[i];
         if (!f || f.img || !f.src || seen['f' + f.src]) continue;
         seen['f' + f.src] = 1;
-        jobs.push({ kind: 'img', src: f.src, obj: f });
+        jobs.push({ kind: 'net', src: f.src });
       }
     }
 
@@ -1523,7 +1525,14 @@
         guard = setTimeout(function () { once(false); }, preloadGuardMs);
       }
       try {
-        if (job.kind === 'img') {
+        if (job.kind === 'net') {
+          if (typeof fetch !== 'function') { once(true); }
+          else {
+            fetch(job.src, { cache: 'force-cache' })
+              .then(function (r) { once(!!r && (r.ok || r.status === 0)); })
+              .catch(function () { once(false); });
+          }
+        } else if (job.kind === 'img') {
           ensureFrame(job.obj, function () { once(!!job.obj.img); });
         } else if (job.kind === 'mask') {
           maskData(job.src, function (ok) { once(ok); });
