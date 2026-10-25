@@ -1636,18 +1636,36 @@
   // composition, so centre them instead of leaving them glued to the left.
   function patchWideUI() {
     var b = MM.codeBundle;
-    if (!b) return;
     var off = '(view_wview[0] - 320) / 2';
-    var key = 'gml_Object_SW_Draw_0';
-    var sw = b[key];
-    if (typeof sw === 'string' && sw.indexOf('// wide fixed') < 0) {
-      b[key] = sw.replace(/view_xview\[0\]/g, '(view_xview[0] + ' + off + ')') + '\n// wide fixed';
+    function widen(src) {
+      var out = src.replace(/view_xview\[0\] \+ 160/g, 'view_xview[0] + ' + off + ' + 160');
+      out = out.replace(/view_xview\[0\] \+ (2[5-9]0|300)\b/g, function (m, n) {
+        return 'view_xview[0] + ' + n + ' + (view_wview[0] - 320)';
+      });
+      return out;
     }
-    for (var k in b) {
-      if (k === key) continue;
-      var s = b[k];
-      if (typeof s !== 'string' || s.indexOf('view_xview[0] + 160') < 0) continue;
-      b[k] = s.replace(/view_xview\[0\] \+ 160/g, 'view_xview[0] + ' + off + ' + 160');
+    if (b) {
+      var key = 'gml_Object_SW_Draw_0';
+      var sw = b[key];
+      if (typeof sw === 'string' && sw.indexOf('// wide fixed') < 0) {
+        b[key] = sw.replace(/view_xview\[0\]/g, '(view_xview[0] + ' + off + ')') + '\n// wide fixed';
+      }
+      for (var k in b) {
+        if (k === key) continue;
+        var s = b[k];
+        if (typeof s !== 'string') continue;
+        if (s.indexOf('view_xview[0] + 160') < 0 && !/view_xview\[0\] \+ (2[5-9]0|300)\b/.test(s)) continue;
+        b[k] = widen(s);
+      }
+    }
+    // Scripts live in their own table; the interpreter calls those strings, so
+    // patching only codeBundle left the HUD X at the old 320-wide position.
+    var scripts = MM.scripts || {};
+    for (var sn in scripts) {
+      var sc = scripts[sn];
+      if (typeof sc !== 'string') continue;
+      if (sc.indexOf('view_xview[0] + 160') < 0 && !/view_xview\[0\] \+ (2[5-9]0|300)\b/.test(sc)) continue;
+      scripts[sn] = widen(sc);
     }
   }
 
