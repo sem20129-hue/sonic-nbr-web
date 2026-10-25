@@ -139,15 +139,22 @@
         extra: wex
       };
     }
+    // 4:3: the authored view (320x260) is shown with ONE uniform scale.  The
+    // old code used the port aspect (640x480) independently on both axes,
+    // which stretched every sprite ~8% wider and made logos/portraits look
+    // squashed.  Letterbox the scaled view inside the port instead.
+    var fitS = Math.min(sx, sy);
+    var fitW = vw * fitS, fitH = vh * fitS;
     return {
       index: idx,
       x: MM.view.xview[idx] || 0,
       y: MM.view.yview[idx] || 0,
       w: vw, h: vh,
-      px: Math.max(0, Math.round((MM.VIEW_W - pw) / 2)), py: 0,
-      pw: pw, ph: ph,
-      sx: sx,
-      sy: sy,
+      px: Math.max(0, Math.round((MM.VIEW_W - fitW) / 2)),
+      py: Math.max(0, Math.round((MM.VIEW_H - fitH) / 2)),
+      pw: fitW, ph: fitH,
+      sx: fitS,
+      sy: fitS,
       extra: 0
     };
   };
@@ -917,7 +924,10 @@
     }
     return def._levelSolid;
   }
-  MM.aspect = '16:9';
+  // 16:9 is still experimental (cut-scene anchors, backdrop seams) and is
+  // only enabled by the page in test mode (?wide=1).  Default is the authored
+  // 4:3 presentation.
+  MM.aspect = '4:3';
   MM.setAspect = function (mode) {
     MM.aspect = (mode === '4:3') ? '4:3' : '16:9';
     if (MM.state.room) {
@@ -1704,6 +1714,30 @@
     ctx.globalCompositeOperation = MM.gfx.blend === 'add' ? 'lighter' : 'source-over';
   }
 
+  // Dialogue panel (SW, 380x96: portrait + black text box + "Enter" tab) is
+  // wider than the 320-px view it was authored for.  Stretching the whole
+  // sprite made the portrait and the frame look squashed.  Instead the panel
+  // is drawn in three 1:1 slices: portrait, a stretched plain-black middle
+  // (borders are horizontal, so they tile perfectly) and the "Enter" tab
+  // pinned to the right edge of the visible view.
+  function drawDialogPanel(ctx, cv, x, y) {
+    var av = MM.activeView();
+    var vw = Math.max(1, av.w);
+    var H = cv.height;
+    var leftW = Math.min(96, cv.width);
+    var rightW = Math.min(110, Math.max(0, cv.width - leftW));
+    var srcMid = cv.width - leftW - rightW;
+    var midW = Math.max(1, Math.round(vw - leftW - rightW));
+    var l = Math.round(x), t = Math.round(y);
+    ctx.drawImage(cv, 0, 0, leftW, H, l, t, leftW, H);
+    if (srcMid > 0) {
+      ctx.drawImage(cv, leftW, 0, srcMid, H, l + leftW, t, midW, H);
+    }
+    if (rightW > 0) {
+      ctx.drawImage(cv, cv.width - rightW, 0, rightW, H, l + leftW + midW, t, rightW, H);
+    }
+  }
+
   MM.gfx.drawSprite = function (ctx, spr, frameIdx, x, y, opts) {
     if (!spr) return;
     var n = spr.frames.length;
@@ -1723,6 +1757,12 @@
     if (!img) return;
     var prevAlpha = ctx.globalAlpha;
     ctx.globalAlpha = Math.max(0, Math.min(1, alpha * prevAlpha));
+    if (!ang && !useTint && spr.w === 380 && spr.h === 96 &&
+        typeof spr.name === 'string' && /^sprSW/.test(spr.name)) {
+      drawDialogPanel(ctx, img, x, y);
+      ctx.globalAlpha = prevAlpha;
+      return;
+    }
     if (ang || sx !== 1 || sy !== 1) {
       ctx.save();
       ctx.translate(x, y);
@@ -1758,7 +1798,11 @@
     var b = MM.bbox(inst);
     if (!b || b.b < av.y || b.t > av.y + av.h) return;
     var cv = buildSpriteCanvas(spr, inst.image_index);
-    if (!cv || cv.width < 200) return;
+    // Only extend genuine backdrop art that covers most of the screen.  The
+    // old "anything wide" rule also smeared menu titles/logos (the SELECT
+    // LANGUAGE logo grew long horizontal streaks from its glow) because their
+    // first/last few pixels were stretched into the margins.
+    if (!cv || cv.width < 200 || cv.height < av.h * 0.5 || cv.width < av.w * 0.5) return;
     var gapL = b.l - vL, gapR = vR - b.r;
     var strip = 4;
     var prevAlpha = ctx.globalAlpha;
@@ -1849,11 +1893,11 @@
     // anchors so they sit on the real screen corners in every mode.
     if (!MM.globals) MM.globals = {};
     MM.globals.HUD_Wide = view.w;
-    // Dialogue panels (SW) are 380 px wide, wider than the 320-px frame they
-    // were authored for.  Stretch/shrink the panel to the visible width so it
-    // always fills the screen and the "Enter" tab is never cut.
+    // Dialogue panels (SW) are laid out in the runtime's drawSprite with the
+    // portrait and text at natural size; only the black middle is extended,
+    // so the panel needs no extra offset/scale here.
     MM.globals.HUD_Dlg = 0;
-    MM.globals.HUD_DlgScale = view.w / 380;
+    MM.globals.HUD_DlgScale = 1;
     var sx = Math.round(MM.fx.shakeX), sy = Math.round(MM.fx.shakeY);
     var drawables = MM.state.instances
       .filter(function (i) { return !i._destroyed && !i._deactivated && i.visible; })

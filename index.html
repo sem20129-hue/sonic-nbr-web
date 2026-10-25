@@ -9,7 +9,7 @@
 // Build sync: ask the server for the current stamp without blocking the page
 // (a synchronous request could hang the loader on a slow CDN).
 (function () {
-  var cur = '20261025192300';
+  var cur = '20261025231722';
   if (!cur || cur.charAt(0) === '_') return;
   try {
     var ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
@@ -125,14 +125,54 @@
     border-radius: 4px; padding: 4px 12px; cursor: pointer;
   }
   #fs:hover { color: #ffe27a; border-color: #55556a; }
-  #aspect {
+  #aspect, #bot-btn {
     font: 12px Consolas, monospace;
     background: #101018; color: #9a9ab0;
     border: 1px solid #33334a; border-bottom-width: 2px;
     border-radius: 4px; padding: 4px 12px; cursor: pointer;
   }
-  #aspect:hover { color: #ffe27a; border-color: #55556a; }
-  body.fakefs #bar, body.fakefs #fs { display: none; }
+  #aspect:hover, #bot-btn:hover { color: #ffe27a; border-color: #55556a; }
+  #bot-btn { color: #b8f5b0; border-color: #2f5a34; }
+  #bot-btn:hover { color: #e6ffe0; border-color: #4f8f57; }
+  body.fakefs #bar, body.fakefs #fs, body.fakefs #bot-btn, body.fakefs #botpanel { display: none; }
+
+  /* --- bot panel ------------------------------------------------------ */
+  #botpanel {
+    display: none;
+    position: fixed; right: 14px; bottom: 46px; z-index: 9999;
+    width: 292px; padding: 12px 12px 10px;
+    background: rgba(10,10,16,.96);
+    border: 1px solid #2f5a34; border-radius: 6px;
+    box-shadow: 0 6px 24px rgba(0,0,0,.6);
+    font: 12px Consolas, monospace; color: #b9b9c6;
+  }
+  #botpanel.open { display: block; }
+  #botpanel .bp-title {
+    color: #b8f5b0; letter-spacing: .06em; margin-bottom: 8px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  #botpanel .bp-close {
+    background: none; border: 0; color: #6d6d80; cursor: pointer;
+    font: 14px Consolas, monospace; padding: 0 2px;
+  }
+  #botpanel .bp-close:hover { color: #fff; }
+  #botpanel .bp-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+  #botpanel .bp-row button {
+    font: 12px Consolas, monospace;
+    background: #131a14; color: #b8f5b0;
+    border: 1px solid #2f5a34; border-radius: 4px;
+    padding: 5px 10px; cursor: pointer;
+  }
+  #botpanel .bp-row button:hover { background: #1b2a1d; border-color: #4f8f57; }
+  #botpanel .bp-row button[data-route="stop"],
+  #botpanel .bp-row button[data-route="all"] { color: #ffe27a; border-color: #5a522f; }
+  #botpanel .bp-row button[data-route="stop"]:hover { background: #2a201b; border-color: #8f574f; color: #ffb0a0; }
+  #botstatus {
+    min-height: 32px; line-height: 1.45; color: #8a8a9e;
+    border-top: 1px solid #23232f; padding-top: 7px;
+  }
+  #botpanel.running #botstatus { color: #cfe9c9; }
+  #botpanel .bp-note { margin-top: 6px; color: #55556a; font-size: 11px; line-height: 1.4; }
   body.fakefs #stage { box-shadow: none; }
 </style>
 </head>
@@ -178,8 +218,23 @@
     </div>
   </div>
   <div id="bar">Загрузка…</div>
-  <button id="fs" type="button">⛶ Полный экран (F) · двойной клик по игре</button>
-  <button id="aspect" type="button">Формат: 16:9</button>
+  <div id="botpanel">
+    <div class="bp-title"><span>БОТ-ДЕМО · автопрохождение</span><button class="bp-close" type="button" title="Закрыть">✕</button></div>
+    <div class="bp-row">
+      <button type="button" data-route="tails">Тейлз</button>
+      <button type="button" data-route="knuckles">Наклз</button>
+      <button type="button" data-route="eggman">Эггман</button>
+      <button type="button" data-route="all">Все три</button>
+      <button type="button" data-route="stop">Стоп</button>
+    </div>
+    <div id="botstatus">Не запущен</div>
+    <div class="bp-note">Бот забирает управление и играет сам: уровни, диалоги и катсцены. Стоп или кнопка «Бот-демо» возвращают управление.</div>
+  </div>
+  <div id="botrow" style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">
+    <button id="fs" type="button">⛶ Полный экран (F) · двойной клик по игре</button>
+    <button id="aspect" type="button">Формат: 16:9</button>
+    <button id="bot-btn" type="button">🤖 Бот-демо</button>
+  </div>
 </div>
 
 <script>
@@ -189,24 +244,25 @@
 </script>
 
 <!-- runtime -->
-<script src="runtime/mm_core.js?v=20261025192300"></script>
-<script src="runtime/mm_interp.js?v=20261025192300"></script>
-<script src="runtime/mm_builtins.js?v=20261025192300"></script>
-<script src="runtime/mm_audio.js?v=20261025192300"></script>
-<script src="runtime/mm_nbr.js?v=20261025192300"></script>
-<script src="runtime/mm_fanending.js?v=20261025192300"></script>
+<script src="runtime/mm_core.js?v=20261025231722"></script>
+<script src="runtime/mm_interp.js?v=20261025231722"></script>
+<script src="runtime/mm_builtins.js?v=20261025231722"></script>
+<script src="runtime/mm_audio.js?v=20261025231722"></script>
+<script src="runtime/mm_nbr.js?v=20261025231722"></script>
+<script src="runtime/mm_fanending.js?v=20261025231722"></script>
+<script src="runtime/mm_bot.js?v=20261025231722"></script>
 
 <!-- generated game package -->
-<script src="game/code.js?v=20261025192300"></script>
-<script src="game/sprites.js?v=20261025192300"></script>
-<script src="game/objects.js?v=20261025192300"></script>
-<script src="game/asset_ids.js?v=20261025192300"></script>
-<script src="game/rooms.js?v=20261025192300"></script>
-<script src="game/scripts.js?v=20261025192300"></script>
-<script src="game/sounds.js?v=20261025192300"></script>
-<script src="game/fonts.js?v=20261025192300"></script>
-<script src="game/assets.js?v=20261025192300"></script>
-<script src="game/tiles.js?v=20261025192300"></script>
+<script src="game/code.js?v=20261025231722"></script>
+<script src="game/sprites.js?v=20261025231722"></script>
+<script src="game/objects.js?v=20261025231722"></script>
+<script src="game/asset_ids.js?v=20261025231722"></script>
+<script src="game/rooms.js?v=20261025231722"></script>
+<script src="game/scripts.js?v=20261025231722"></script>
+<script src="game/sounds.js?v=20261025231722"></script>
+<script src="game/fonts.js?v=20261025231722"></script>
+<script src="game/assets.js?v=20261025231722"></script>
+<script src="game/tiles.js?v=20261025231722"></script>
 
 <script>
 (function () {
@@ -305,7 +361,7 @@
   stage.addEventListener('dblclick', toggleFs);
   window.addEventListener('keydown', function (e) {
     if (e.keyCode === 70 && !e.ctrlKey && !e.altKey && !e.metaKey) toggleFs(); // F
-    if (e.keyCode === 52 && !e.ctrlKey && !e.altKey && !e.metaKey) applyAspect(MM.aspect === '4:3' ? '16:9' : '4:3'); // 4
+    if (e.keyCode === 52 && WIDE_TEST && !e.ctrlKey && !e.altKey && !e.metaKey) applyAspect(MM.aspect === '4:3' ? '16:9' : '4:3'); // 4 (test only)
     if (e.keyCode === 114) { e.preventDefault(); MM.debugKinds = !MM.debugKinds; } // F3
     if (e.keyCode === 27 && stage.classList.contains('fakefs') && !realFs()) fakeFs(false);
   });
@@ -330,21 +386,34 @@
   // to the CSS full-window layout so the result is the same either way.
   MM.onFullscreenFallback = function (on) { fakeFs(!!on); };
 
-  // --- aspect mode (16:9 wide view / 4:3 original) ----------------------
+  // --- aspect mode ------------------------------------------------------
+  // 16:9 is experimental (cut-scenes, backdrop seams) and is NOT playable for
+  // visitors: the page always starts in the authored 4:3 mode.  The wide mode
+  // can only be opened for testing with ?wide=1 in the URL.
+  var WIDE_TEST = false;
+  try { WIDE_TEST = /(?:^|[?&])wide=1(?:&|$)/.test(location.search); } catch (e) { WIDE_TEST = false; }
   var aspectBtn = document.getElementById('aspect');
   function applyAspect(mode) {
+    if (!WIDE_TEST) mode = '4:3';
     MM.setAspect(mode);
-    aspectBtn.textContent = 'Формат: ' + (MM.aspect === '4:3' ? '4:3' : '16:9');
+    aspectBtn.textContent = 'Формат: ' + (MM.aspect === '4:3' ? '4:3' : '16:9 (тест)');
     try { localStorage.setItem('nbr.aspect', MM.aspect); } catch (e) { /* ignore */ }
     fit();
   }
   aspectBtn.addEventListener('click', function () {
+    if (!WIDE_TEST) return;
     applyAspect(MM.aspect === '4:3' ? '16:9' : '4:3');
     if (this.blur) this.blur();
   });
-  try {
-    if (localStorage.getItem('nbr.aspect') === '4:3') applyAspect('4:3');
-  } catch (e) { /* ignore */ }
+  if (!WIDE_TEST) {
+    aspectBtn.style.display = 'none';
+    applyAspect('4:3');
+  } else {
+    try {
+      if (localStorage.getItem('nbr.aspect') === '16:9') applyAspect('16:9');
+      else applyAspect('4:3');
+    } catch (e) { applyAspect('4:3'); }
+  }
 
 
   // --- full preload ----------------------------------------------------

@@ -1840,10 +1840,10 @@
   }
 
   // Cutscene dialogue: SW advances on keyboard_check_pressed(vk_enter) with no
-  // debounce.  A held/repeated Enter (or a fast key repeat from the OS) could
-  // advance many pages in a single frame -- each page fires cutscene alarms and
-  // instance_create chains, which ended in a frozen frame.  One advance per 3
-  // steps is still instant for a human but cannot cascade.
+  // rate limit.  A very fast key repeat could cascade many pages in a few
+  // frames, each firing cutscene alarms; but a plain time cooldown swallowed
+  // real presses (the page did not advance at all).  Buffer the press instead:
+  // every press is honoured, at most one page per 8 steps.
   function patchDialogAdvance() {
     var b = MM.codeBundle;
     if (!b) return;
@@ -1853,9 +1853,11 @@
     var inKey = 'if (keyboard_check_pressed(vk_enter))\n{';
     if (s.indexOf(inKey) < 0) return;
     s = s.replace(inKey,
-      'if (keyboard_check_pressed(vk_enter) && (!_advCd || _advCd <= 0))\n' +
+      'if (keyboard_check_pressed(vk_enter)) _advBuf = 1;\n' +
+      'if (_advBuf == 1 && (!_advCd || _advCd <= 0))\n' +
       '{\n' +
-      '    _advCd = 6;');
+      '    _advBuf = 0;\n' +
+      '    _advCd = 8;');
     s = 'if (_advCd > 0) _advCd -= 1;\n' + s + '\n// dialog debounce';
     b[key] = s;
   }
@@ -1898,20 +1900,11 @@
       var key = 'gml_Object_SW_Draw_0';
       var sw = b[key];
       if (typeof sw === 'string' && sw.indexOf('// wide fixed') < 0) {
-        // The dialogue panel sprite is 380 px wide (portrait + text + "Enter"),
-        // wider than the 320-px view it was authored for, so it used to be cut
-        // at the right edge.  Stretch it to the visible width (global.HUD_DlgScale)
-        // so the panel fills the screen and the "Enter" tab is always visible.
+        // The dialogue panel (380x96) is wider than the 320-px view.  The
+        // runtime draws it in three 1:1 slices (portrait, extended black
+        // middle, "Enter" tab at the right edge), so no stretching is needed
+        // here: keep the authored 1:1 layout and the natural text inset.
         sw = sw.replace(/view_xview\[0\]/g, '(view_xview[0] + (global.HUD_Dlg || 0))');
-        sw = sw.replace(
-          /draw_sprite\((sprSW\w+), 1, \(view_xview\[0\] \+ \(global\.HUD_Dlg \|\| 0\)\), view_yview\[0\]\)/g,
-          'draw_sprite_ext($1, 1, (view_xview[0] + (global.HUD_Dlg || 0)), view_yview[0], global.HUD_DlgScale, 1, 0, c_white, 1)');
-        // The text sits inside the stretched panel: scale its inset too, or it
-        // would start on top of the portrait.
-        sw = sw.replace(/\+ 100, view_yview\[0\] \+ 5/g,
-          '+ 100 * (global.HUD_DlgScale || 1), view_yview[0] + 5');
-        sw = sw.replace(/\+ 120, view_yview\[0\] \+ 10/g,
-          '+ 120 * (global.HUD_DlgScale || 1), view_yview[0] + 10');
         b[key] = sw + '\n// wide fixed';
       }
       // Metal Sonic / Exetior entrance: the spawn was x +-200, which was just
@@ -1955,6 +1948,22 @@
     }
   }
 
+  // Knuckles' Scrap Brain columns (YCR_BrokeWall1) are breakable objects that
+  // watch Pers_Obj.Punch/Tornado.  During the story cutscene the hero object is
+  // still present (so the scene can animate him), and the columns near the set
+  // were being destroyed, which broke the whole choreography.  Freeze them
+  // while a dialogue or a scripted animation (Move=0 / Handle=0) is running.
+  function patchCutsceneWalls() {
+    var b = MM.codeBundle;
+    if (!b) return;
+    var key = 'gml_Object_YCR_BrokeWall1_Step_0';
+    var s = b[key];
+    if (typeof s !== 'string' || s.indexOf('// cutscene safe') >= 0) return;
+    b[key] = '// cutscene safe\n' +
+      'if (!(instance_exists(SW) || (instance_exists(Pers_Obj) && ((Pers_Obj.Move == 0) || (Pers_Obj.Handle == 0)))))\n' +
+      '{\n' + s + '\n}\n';
+  }
+
   MM.nbrBoot = function (opts) {
     patchSpringContacts();
     patchBirdFacing();
@@ -1963,6 +1972,7 @@
     patchKnucklesClimb();
     patchGlideTurn();
     patchDialogAdvance();
+    patchCutsceneWalls();
     patchWideUI();
     opts = opts || {};
     MM.VIEW_W = opts.width || 640;
