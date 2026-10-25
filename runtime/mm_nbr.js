@@ -1529,7 +1529,13 @@
           if (typeof fetch !== 'function') { once(true); }
           else {
             fetch(job.src, { cache: 'force-cache' })
-              .then(function (r) { once(!!r && (r.ok || r.status === 0)); })
+              .then(function (r) {
+                if (!r || !(r.ok || r.status === 0)) { once(false); return; }
+                // Consume the body so the HTTP cache really stores it; the Blob
+                // is dropped immediately, so memory stays bounded.
+                if (r.blob) r.blob().then(function () { once(true); }, function () { once(true); });
+                else once(true);
+              })
               .catch(function () { once(false); });
           }
         } else if (job.kind === 'img') {
