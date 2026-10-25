@@ -171,7 +171,8 @@
     if (!S || S.room !== room) { bgInit(room); S = MM.bg; }
     if (!foreground) bgTick();
     var act = MM.activeView ? MM.activeView() : null;
-    var spanW = act ? act.w : (room && room.view ? room.view.w : MM.VIEW_W);
+    var ex = act && act.extra ? act.extra : 0;
+    var spanW = (act ? act.w : (room && room.view ? room.view.w : MM.VIEW_W)) + 2 * ex;
     var spanH = act ? act.h : (room && room.view ? room.view.h : MM.VIEW_H);
     for (var i = 0; i < BG_SLOTS; i++) {
       if (!S.visible[i]) continue;
@@ -195,8 +196,9 @@
         continue;
       }
       var iw = img.width, ih = img.height;
-      var col0 = Math.floor((vx - baseX) / iw);
-      var col1 = Math.ceil((vx + spanW - baseX) / iw);
+      var left = vx - ex;
+      var col0 = Math.floor((left - baseX) / iw);
+      var col1 = Math.ceil((left + spanW - baseX) / iw);
       var row0 = Math.floor((vy - baseY) / ih);
       var row1 = Math.ceil((vy + spanH - baseY) / ih);
       // A slot that is not tiled is drawn once, wherever it sits in the room.

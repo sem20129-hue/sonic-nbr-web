@@ -95,7 +95,7 @@
 <body>
 <div id="wrap">
   <div id="stage">
-    <canvas id="game" width="640" height="480"></canvas>
+    <canvas id="game" width="854" height="480"></canvas>
     <div id="hud"></div>
     <div id="overlay">
       <div class="card">
@@ -143,24 +143,24 @@
 </script>
 
 <!-- runtime -->
-<script src="runtime/mm_core.js?v=202610251111"></script>
-<script src="runtime/mm_interp.js?v=202610251111"></script>
-<script src="runtime/mm_builtins.js?v=202610251111"></script>
-<script src="runtime/mm_audio.js?v=202610251111"></script>
-<script src="runtime/mm_nbr.js?v=202610251111"></script>
-<script src="runtime/mm_fanending.js?v=202610251111"></script>
+<script src="runtime/mm_core.js?v=202610251159"></script>
+<script src="runtime/mm_interp.js?v=202610251159"></script>
+<script src="runtime/mm_builtins.js?v=202610251159"></script>
+<script src="runtime/mm_audio.js?v=202610251159"></script>
+<script src="runtime/mm_nbr.js?v=202610251159"></script>
+<script src="runtime/mm_fanending.js?v=202610251159"></script>
 
 <!-- generated game package -->
-<script src="game/code.js?v=202610251111"></script>
-<script src="game/sprites.js?v=202610251111"></script>
-<script src="game/objects.js?v=202610251111"></script>
-<script src="game/asset_ids.js?v=202610251111"></script>
-<script src="game/rooms.js?v=202610251111"></script>
-<script src="game/scripts.js?v=202610251111"></script>
-<script src="game/sounds.js?v=202610251111"></script>
-<script src="game/fonts.js?v=202610251111"></script>
-<script src="game/assets.js?v=202610251111"></script>
-<script src="game/tiles.js?v=202610251111"></script>
+<script src="game/code.js?v=202610251159"></script>
+<script src="game/sprites.js?v=202610251159"></script>
+<script src="game/objects.js?v=202610251159"></script>
+<script src="game/asset_ids.js?v=202610251159"></script>
+<script src="game/rooms.js?v=202610251159"></script>
+<script src="game/scripts.js?v=202610251159"></script>
+<script src="game/sounds.js?v=202610251159"></script>
+<script src="game/fonts.js?v=202610251159"></script>
+<script src="game/assets.js?v=202610251159"></script>
+<script src="game/tiles.js?v=202610251159"></script>
 
 <script>
 (function () {
@@ -183,12 +183,13 @@
     var availH = full ? window.innerHeight : window.innerHeight - barH - 68;
     if (availW < 80) availW = 80;
     if (availH < 60) availH = 60;
-    var raw = Math.min(availW / 640, availH / 480);
+    var baseW = canvas.width || 854, baseH = canvas.height || 480;
+    var raw = Math.min(availW / baseW, availH / baseH);
     // Fill the window/screen in both modes.  Integer scaling (the old
     // windowed behaviour) left a 640x480 island on any normal display.
     var scale = raw;
-    var w = Math.max(1, Math.floor(640 * scale));
-    var h = Math.max(1, Math.floor(480 * scale));
+    var w = Math.max(1, Math.floor(baseW * scale));
+    var h = Math.max(1, Math.floor(baseH * scale));
     canvas.style.width = w + 'px';
     canvas.style.height = h + 'px';
     // Native fullscreen makes #stage a fixed element pinned to 0,0.  A fixed
@@ -257,7 +258,7 @@
                     ' · звуков: ' + (summary.sounds || 0) +
                     ' · скриптов: ' + (summary.scripts || 0);
 
-  MM.nbrBoot({ canvas: canvas, room: 'LanguageSelect_19', width: 640, height: 480, fps: 60 });
+  MM.nbrBoot({ canvas: canvas, room: 'LanguageSelect_19', width: 854, height: 480, fps: 60 });
   // The decompiled game toggles fullscreen with its own `S` key
   // (window_set_fullscreen).  Some browsers reject that API; route the failure
   // to the CSS full-window layout so the result is the same either way.

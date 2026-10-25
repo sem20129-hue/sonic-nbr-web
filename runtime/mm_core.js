@@ -84,21 +84,32 @@
     var vh = MM.view.hview[idx] || MM.VIEW_H;
     var pw = MM.view.portW[idx] || MM.VIEW_W;
     var ph = MM.view.portH[idx] || MM.VIEW_H;
-    // A few rooms (JKN_0) declare a 1024x768 port.  Drawn oversized it lost the
-    // right third of the logo; the port must fit the 640x480 application
-    // surface, exactly like a 640x480 GM window would.
-    if (pw > MM.VIEW_W) pw = MM.VIEW_W;
-    if (ph > MM.VIEW_H) ph = MM.VIEW_H;
+    // A few rooms (JKN_0) declare a 1024x768 port: scale the whole port down
+    // proportionally, never wider than the surface.
+    if (pw > MM.VIEW_W || ph > MM.VIEW_H) {
+      var fit = Math.min(MM.VIEW_W / pw, MM.VIEW_H / ph);
+      pw *= fit;
+      ph *= fit;
+    }
+    var sx = pw / vw, sy = ph / vh;
+    // Rooms whose camera follows a hero get a real widescreen view: keep the
+    // original pixel scale (no stretching) and reveal extra world on both
+    // sides.  Static art screens (logos, menus, title) keep the exact 4:3
+    // composition centred with clean side bars -- expanding those only showed
+    // seams where the artwork ends.
+    var follow = !!MM.view.object[idx];
+    var extra = follow ? (MM.VIEW_W - pw) / (2 * sx) : 0;
+    var px = follow ? 0 : Math.max(0, Math.round((MM.VIEW_W - pw) / 2));
     return {
       index: idx,
       x: MM.view.xview[idx] || 0,
       y: MM.view.yview[idx] || 0,
       w: vw, h: vh,
-      px: MM.view.portX[idx] || 0,
-      py: MM.view.portY[idx] || 0,
+      px: px, py: 0,
       pw: pw, ph: ph,
-      sx: pw / vw,
-      sy: ph / vh
+      sx: sx,
+      sy: sy,
+      extra: extra > 0 ? extra : 0
     };
   };
 
@@ -211,6 +222,7 @@
   MM.spriteCanvas = buildSpriteCanvas;
 
   MM.spriteTinted = function (spr, frameIdx, hex) {
+    if (!spr._tints) spr._tints = {};
     var key = frameIdx + '|' + hex;
     if (spr._tints[key]) return spr._tints[key];
     var base = buildSpriteCanvas(spr, frameIdx);
@@ -1618,6 +1630,7 @@
 
     var view = MM.activeView();
     var vx = view.x, vy = view.y, vw = view.w, vh = view.h;
+    var ex = view.extra || 0;
     var sx = Math.round(MM.fx.shakeX), sy = Math.round(MM.fx.shakeY);
     var drawables = MM.state.instances
       .filter(function (i) { return !i._destroyed && !i._deactivated && i.visible; })
@@ -1627,7 +1640,7 @@
     ctx.save();
     ctx.imageSmoothingEnabled = false;
     ctx.setTransform(view.sx, 0, 0, view.sy,
-      Math.round(view.px - vx * view.sx) + sx,
+      Math.round(view.px - (vx - ex) * view.sx) + sx,
       Math.round(view.py - vy * view.sy) + sy);
     MM.gfxCtx = ctx;
     if (MM.gfx.drawBackgrounds) MM.gfx.drawBackgrounds(ctx, room, vx, vy, false);
@@ -1651,12 +1664,21 @@
       var inst = drawables[i];
       while (tIdx < tileDraw.length && tileDraw[tIdx].d > inst.depth) drawRoomTile(ctx, tileDraw[tIdx++]);
       if (MM.eventCode(inst.object_index, 'draw')) {
-        MM.runEvent(inst, 'draw');
+        if (ex && inst.object_name === 'HUDer') {
+          // The HUD compensates the camera with view_xview; keep it pinned to
+          // the physical screen edge instead of the logical view edge.
+          ctx.save();
+          ctx.translate(-ex * view.sx, 0);
+          MM.runEvent(inst, 'draw');
+          ctx.restore();
+        } else {
+          MM.runEvent(inst, 'draw');
+        }
       } else if (inst.sprite_index) {
         // отсечение за экраном для обычных спрайтовых объектов
         var spr = inst.sprite_index;
         var sw = spr.w * Math.abs(inst.image_xscale), shh = spr.h * Math.abs(inst.image_yscale);
-        if (inst.x + sw < vx - 64 || inst.x - sw > vx + vw + 64 ||
+        if (inst.x + sw < vx - ex - 64 || inst.x - sw > vx + vw + ex + 64 ||
             inst.y + shh < vy - 64 || inst.y - shh > vy + vh + 64) continue;
         MM.gfx.drawSelf(ctx, inst);
       }
