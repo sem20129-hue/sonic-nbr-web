@@ -1631,12 +1631,33 @@
     }
   }
 
+  // The game was laid out for a 320-wide view.  In the 16:9 view (463 wide)
+  // dialogs and cutscene elements anchored to the view keep their 320-wide
+  // composition, so centre them instead of leaving them glued to the left.
+  function patchWideUI() {
+    var b = MM.codeBundle;
+    if (!b) return;
+    var off = '(view_wview[0] - 320) / 2';
+    var key = 'gml_Object_SW_Draw_0';
+    var sw = b[key];
+    if (typeof sw === 'string' && sw.indexOf('// wide fixed') < 0) {
+      b[key] = sw.replace(/view_xview\[0\]/g, '(view_xview[0] + ' + off + ')') + '\n// wide fixed';
+    }
+    for (var k in b) {
+      if (k === key) continue;
+      var s = b[k];
+      if (typeof s !== 'string' || s.indexOf('view_xview[0] + 160') < 0) continue;
+      b[k] = s.replace(/view_xview\[0\] \+ 160/g, 'view_xview[0] + ' + off + ' + 160');
+    }
+  }
+
   MM.nbrBoot = function (opts) {
     patchSpringContacts();
     patchBirdFacing();
     patchSegaCheat();
     patchKeyboardEvents();
     patchKnucklesClimb();
+    patchWideUI();
     opts = opts || {};
     MM.VIEW_W = opts.width || 640;
     MM.VIEW_H = opts.height || 480;

@@ -92,14 +92,28 @@
       ph *= fit;
     }
     var sx = pw / vw, sy = ph / vh;
-    // The page draws a blurred copy of the frame into the 16:9 sides; the game
-    // itself keeps the exact 4:3 composition of the original.
+    // Camera rooms get a real 16:9 view: widen the logical view to the screen
+    // aspect instead of showing out-of-room strips.  Static art screens keep
+    // the original 4:3 port, centred.
+    if (MM.view.object[idx]) {
+      return {
+        index: idx,
+        x: MM.view.xview[idx] || 0,
+        y: MM.view.yview[idx] || 0,
+        w: vw, h: vh,
+        px: 0, py: 0,
+        pw: MM.VIEW_W, ph: MM.VIEW_H,
+        sx: MM.VIEW_W / vw,
+        sy: MM.VIEW_H / vh,
+        extra: 0
+      };
+    }
     return {
       index: idx,
       x: MM.view.xview[idx] || 0,
       y: MM.view.yview[idx] || 0,
       w: vw, h: vh,
-      px: MM.view.portX[idx] || 0, py: MM.view.portY[idx] || 0,
+      px: Math.max(0, Math.round((MM.VIEW_W - pw) / 2)), py: 0,
       pw: pw, ph: ph,
       sx: sx,
       sy: sy,
@@ -1366,6 +1380,13 @@
       MM.view.visible[i] = !!(v.enabled === undefined ? true : v.enabled);
       MM.view.wview[i] = v.w || MM.VIEW_W;
       MM.view.hview[i] = v.h || MM.VIEW_H;
+      // 16:9: a camera view uses the full screen width.  Widening the logical
+      // view (instead of showing strips outside the room) keeps backgrounds,
+      // tiles and the camera clamp seamless.
+      if (v.object) {
+        var wide = Math.round(MM.view.hview[i] * MM.VIEW_W / MM.VIEW_H);
+        if (wide > MM.view.wview[i]) MM.view.wview[i] = wide;
+      }
       MM.view.portX[i] = v.portX || 0;
       MM.view.portY[i] = v.portY || 0;
       MM.view.portW[i] = v.portW || MM.VIEW_W;
