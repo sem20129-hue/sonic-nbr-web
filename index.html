@@ -135,24 +135,24 @@
 </script>
 
 <!-- runtime -->
-<script src="runtime/mm_core.js?v=202610251011"></script>
-<script src="runtime/mm_interp.js?v=202610251011"></script>
-<script src="runtime/mm_builtins.js?v=202610251011"></script>
-<script src="runtime/mm_audio.js?v=202610251011"></script>
-<script src="runtime/mm_nbr.js?v=202610251011"></script>
-<script src="runtime/mm_fanending.js?v=202610251011"></script>
+<script src="runtime/mm_core.js?v=202610251035"></script>
+<script src="runtime/mm_interp.js?v=202610251035"></script>
+<script src="runtime/mm_builtins.js?v=202610251035"></script>
+<script src="runtime/mm_audio.js?v=202610251035"></script>
+<script src="runtime/mm_nbr.js?v=202610251035"></script>
+<script src="runtime/mm_fanending.js?v=202610251035"></script>
 
 <!-- generated game package -->
-<script src="game/code.js?v=202610251011"></script>
-<script src="game/sprites.js?v=202610251011"></script>
-<script src="game/objects.js?v=202610251011"></script>
-<script src="game/asset_ids.js?v=202610251011"></script>
-<script src="game/rooms.js?v=202610251011"></script>
-<script src="game/scripts.js?v=202610251011"></script>
-<script src="game/sounds.js?v=202610251011"></script>
-<script src="game/fonts.js?v=202610251011"></script>
-<script src="game/assets.js?v=202610251011"></script>
-<script src="game/tiles.js?v=202610251011"></script>
+<script src="game/code.js?v=202610251035"></script>
+<script src="game/sprites.js?v=202610251035"></script>
+<script src="game/objects.js?v=202610251035"></script>
+<script src="game/asset_ids.js?v=202610251035"></script>
+<script src="game/rooms.js?v=202610251035"></script>
+<script src="game/scripts.js?v=202610251035"></script>
+<script src="game/sounds.js?v=202610251035"></script>
+<script src="game/fonts.js?v=202610251035"></script>
+<script src="game/assets.js?v=202610251035"></script>
+<script src="game/tiles.js?v=202610251035"></script>
 
 <script>
 (function () {
@@ -176,9 +176,9 @@
     if (availW < 80) availW = 80;
     if (availH < 60) availH = 60;
     var raw = Math.min(availW / 640, availH / 480);
-    // Windowed mode keeps crisp integer scaling; full screen is asked to fill
-    // the screen edge to edge, so there it uses the exact scale.
-    var scale = (full || raw < 1) ? raw : Math.floor(raw);
+    // Fill the window/screen in both modes.  Integer scaling (the old
+    // windowed behaviour) left a 640x480 island on any normal display.
+    var scale = raw;
     var w = Math.max(1, Math.floor(640 * scale));
     var h = Math.max(1, Math.floor(480 * scale));
     canvas.style.width = w + 'px';
@@ -190,20 +190,29 @@
   fit();
 
   // --- fullscreen -------------------------------------------------------
-  // Button + F + double click.  Browsers without requestFullscreen (old iOS)
-  // get a CSS "fake fullscreen": the stage just fills the window.
+  // Button + F + double click.  Real fullscreen is requested, but the page
+  // switches to a window-filling layout immediately: embedded browsers and
+  // iframes without allowfullscreen reject requestFullscreen, and the old code
+  // then did nothing at all.  The CSS fallback always fills the screen.
+  function realFs() {
+    return !!(document.fullscreenElement || document.webkitFullscreenElement);
+  }
   function toggleFs() {
+    if (realFs()) {
+      var q = document.exitFullscreen || document.webkitExitFullscreen;
+      try { if (q) q.call(document); } catch (e) { /* ignore */ }
+      fakeFs(false);
+      return;
+    }
+    if (stage.classList.contains('fakefs')) { fakeFs(false); return; }
+    fakeFs(true);
     try {
-      var full = document.fullscreenElement || document.webkitFullscreenElement;
-      if (full) {
-        var q = document.exitFullscreen || document.webkitExitFullscreen;
-        if (q) q.call(document);
-      } else {
-        var el = stage, rq = el.requestFullscreen || el.webkitRequestFullscreen;
-        if (rq) { rq.call(el); fakeFs(false); }
-        else fakeFs(!stage.classList.contains('fakefs'));
+      var rq = stage.requestFullscreen || stage.webkitRequestFullscreen;
+      if (rq) {
+        var p = rq.call(stage);
+        if (p && p.then) p.then(function () { fakeFs(false); }, function () {});
       }
-    } catch (e) { /* ignore */ }
+    } catch (e) { /* keep the CSS full window fallback */ }
   }
   function fakeFs(on) {
     stage.classList.toggle('fakefs', on);
@@ -214,10 +223,13 @@
   stage.addEventListener('dblclick', toggleFs);
   window.addEventListener('keydown', function (e) {
     if (e.keyCode === 70 && !e.ctrlKey && !e.altKey && !e.metaKey) toggleFs(); // F
+    if (e.keyCode === 27 && stage.classList.contains('fakefs') && !realFs()) fakeFs(false);
   });
   ['fullscreenchange', 'webkitfullscreenchange'].forEach(function (ev) {
     document.addEventListener(ev, fit);
   });
+  window.addEventListener('orientationchange', fit);
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', fit);
 
   // --- boot ------------------------------------------------------------
   var MM = window.MM;

@@ -918,9 +918,20 @@
         MM.globals.vel = 0;
       }
     }
-    // A hero resting exactly against a wall (inclusive boxes) makes the game's
-    // ceiling probe touch that wall and cancels every jump.  Keep a one pixel
-    // side clearance, like GM's movement look-ahead does.
+    separatePlayerSides();
+  }
+
+  // A hero resting exactly against a wall (inclusive boxes) makes the game's
+  // vertical probes touch that wall: the decompiled ground checks call
+  // `place_meeting(x, bbox_bottom + 1, ...)`, which shifts the WHOLE mask down
+  // one pixel, so a flush side contact is reported as solid ground.  Tails
+  // refilled his flight stamina (`FlyTime = 225`) just by brushing a wall, and
+  // the old code also cancelled jumps next to one.  Push the hero out to a one
+  // pixel side clearance before collision events run, so the game never sees a
+  // zero-pixel wall contact as ground.  Only shallow horizontal contacts are
+  // touched: ledges keep their vertical landing.
+  function separatePlayerSides() {
+    var list = MM.state.instances;
     for (var j = 0; j < list.length; j++) {
       var p = list[j];
       if (p._destroyed || p._deactivated || !isPlayerInst(p)) continue;
@@ -933,8 +944,18 @@
         var ob = MM.bbox(o);
         if (!ob) continue;
         if (pb.t >= ob.b || pb.b <= ob.t) continue; // no vertical overlap
-        if (pb.r === ob.l) { p.x -= 1; MM.globals.vel = 0; break; }
-        if (pb.l === ob.r) { p.x += 1; MM.globals.vel = 0; break; }
+        var dx = Math.min(pb.r, ob.r) - Math.max(pb.l, ob.l);
+        var dy = Math.min(pb.b, ob.b) - Math.max(pb.t, ob.t);
+        if (dx < 0 || dx > 2) continue; // gap, or deep inside (other resolver)
+        if (dy < 6) continue;           // ledge / thin walkway: land normally
+        if (pb.l + pb.r < ob.l + ob.r) {
+          p.x -= dx + 1;
+          if (MM.globals.vel > 0) MM.globals.vel = 0;
+        } else {
+          p.x += dx + 1;
+          if (MM.globals.vel < 0) MM.globals.vel = 0;
+        }
+        pb = MM.bbox(p);
       }
     }
   }
@@ -1254,6 +1275,8 @@
     tickPhysics();
     tickPaths();
     tickOutsideRoom();
+    // Keep flush wall contacts out of collision events (false "ground").
+    separatePlayerSides();
     tickCollisions();
     resolvePlayerOverlap();
     if (MM._hasEndStep) {

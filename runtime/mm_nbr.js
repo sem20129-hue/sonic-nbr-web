@@ -421,6 +421,39 @@
   /*  Key events                                                           */
   /* ===================================================================== */
 
+  // GameMaker "Keyboard" events (ev_keyboard) fire every step while the key is
+  // held.  Only a handful of objects use them, so keep a small per-version
+  // list instead of walking 1600 instances for every pressed key.
+  function hasKeyboardEvents(def) {
+    if (!def) return false;
+    if (def._hasKeyboard !== undefined) return def._hasKeyboard;
+    var d = def, found = false;
+    while (d && !found) {
+      var evs = d.events;
+      if (evs) {
+        for (var k in evs) {
+          if (k.indexOf('keyboard') === 0 && typeof evs[k] === 'string' && evs[k].length) { found = true; break; }
+        }
+      }
+      d = d.parent ? MM.resolveObject(d.parent) : null;
+    }
+    def._hasKeyboard = found;
+    return found;
+  }
+
+  function keyboardInstanceList() {
+    var st = MM.state;
+    if (st._keyboardList && st._keyboardList.v === st.version) return st._keyboardList.list;
+    var arr = [];
+    for (var i = 0; i < st.instances.length; i++) {
+      var o = st.instances[i];
+      if (o._destroyed || o._deactivated) continue;
+      if (hasKeyboardEvents(o.object_index)) arr.push(o);
+    }
+    st._keyboardList = { v: st.version, list: arr };
+    return arr;
+  }
+
   MM.dispatchKeyEvents = function () {
     var pressed = MM.input.pressed, released = MM.input.released;
     var list = MM.state.instances;
@@ -438,6 +471,17 @@
       for (var j = 0; j < list.length; j++) {
         if (list[j]._destroyed || list[j]._deactivated) continue;
         if (MM.eventCode(list[j].object_index, ev2)) MM.runEvent(list[j], ev2);
+      }
+    }
+    var kb = keyboardInstanceList();
+    if (kb.length) {
+      for (var held in MM.input.keys) {
+        if (!MM.input.keys[held]) continue;
+        var evk = 'keyboard_' + held;
+        for (var n = 0; n < kb.length; n++) {
+          if (kb[n]._destroyed || kb[n]._deactivated) continue;
+          if (MM.eventCode(kb[n].object_index, evk)) MM.runEvent(kb[n], evk);
+        }
       }
     }
   };
@@ -1499,9 +1543,44 @@
     b[key] = src + '\n// facing fixed\nif (GOD_OBJECT.DeadAnimals == 0) { hspeed = image_xscale * 3.5; }';
   }
 
+  // The decompiled SEGA-logo handler sets `Act = 4` on the first `A` press, so
+  // `Time` can never reach 4 and the cheat can never unlock debug mode.  Move
+  // the state change inside the counter block: hold/tap `A` four times after
+  // `S E G` and `global.Debug_mode` is set (key `U` then spawns the debug
+  // free-fly activator).  Small, documented compat fix for unreachable code.
+  function patchSegaCheat() {
+    var b = MM.codeBundle;
+    if (!b) return;
+    var key = 'gml_Object_SEGA_LOGO_Keyboard_65';
+    var src = b[key];
+    if (typeof src !== 'string') return;
+    if (src.indexOf('// sega fixed') >= 0) return;
+    if (src.indexOf('Act = 4;') < 0) return;
+    b[key] = src.replace(
+      '    audio_play_sound(SFX_Ring, 1, false);\n    Act = 4;',
+      '    audio_play_sound(SFX_Ring, 1, false);\n    if (Time >= 4) { Act = 4; } // sega fixed');
+  }
+
+  function patchKeyboardEvents() {
+    var objs = MM.objects || {};
+    for (var name in objs) {
+      var def = objs[name];
+      var evs = def && def.events;
+      if (!evs || typeof evs.keyboard !== 'string') continue;
+      var m = /Keyboard_(\d+)/.exec(evs.keyboard);
+      if (!m) continue;
+      var key = 'keyboard_' + m[1];
+      if (!evs[key]) evs[key] = evs.keyboard;
+      delete evs.keyboard;
+      def._eventCode = null;
+    }
+  }
+
   MM.nbrBoot = function (opts) {
     patchSpringContacts();
     patchBirdFacing();
+    patchSegaCheat();
+    patchKeyboardEvents();
     opts = opts || {};
     MM.VIEW_W = opts.width || 640;
     MM.VIEW_H = opts.height || 480;
