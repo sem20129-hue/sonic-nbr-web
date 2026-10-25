@@ -95,7 +95,7 @@
     // Camera rooms get a real 16:9 view: widen the logical view to the screen
     // aspect instead of showing out-of-room strips.  Static art screens keep
     // the original 4:3 port, centred.
-    if (MM.view.object[idx]) {
+    if (MM.aspect !== '4:3' && MM.view.object[idx]) {
       return {
         index: idx,
         x: MM.view.xview[idx] || 0,
@@ -886,6 +886,16 @@
     }
     return def._levelSolid;
   }
+  MM.aspect = '16:9';
+  MM.setAspect = function (mode) {
+    MM.aspect = (mode === '4:3') ? '4:3' : '16:9';
+    if (MM.state.room) {
+      MM.applyRoomView(MM.state.room);
+      MM.view.xview[0] = MM.view.xview[0] || 0;
+    }
+    return MM.aspect;
+  };
+
   MM.isLevelSolid = isLevelSolid;
 
   // Semantic kinds for level objects: floor / wall / ceiling / break / slope /
@@ -1415,7 +1425,7 @@
       // 16:9: a camera view uses the full screen width.  Widening the logical
       // view (instead of showing strips outside the room) keeps backgrounds,
       // tiles and the camera clamp seamless.
-      if (v.object) {
+      if (v.object && MM.aspect !== '4:3') {
         var wide = Math.round(MM.view.hview[i] * MM.VIEW_W / MM.VIEW_H);
         if (wide > MM.view.wview[i]) MM.view.wview[i] = wide;
       }

@@ -90,6 +90,13 @@
     border-radius: 4px; padding: 4px 12px; cursor: pointer;
   }
   #fs:hover { color: #ffe27a; border-color: #55556a; }
+  #aspect {
+    font: 12px Consolas, monospace;
+    background: #101018; color: #9a9ab0;
+    border: 1px solid #33334a; border-bottom-width: 2px;
+    border-radius: 4px; padding: 4px 12px; cursor: pointer;
+  }
+  #aspect:hover { color: #ffe27a; border-color: #55556a; }
   body.fakefs #bar, body.fakefs #fs { display: none; }
   body.fakefs #stage { box-shadow: none; }
 </style>
@@ -136,6 +143,7 @@
   </div>
   <div id="bar">Загрузка…</div>
   <button id="fs" type="button">⛶ Полный экран (F) · двойной клик по игре</button>
+  <button id="aspect" type="button">Формат: 16:9</button>
 </div>
 
 <script>
@@ -145,24 +153,24 @@
 </script>
 
 <!-- runtime -->
-<script src="runtime/mm_core.js?v=202610251422"></script>
-<script src="runtime/mm_interp.js?v=202610251422"></script>
-<script src="runtime/mm_builtins.js?v=202610251422"></script>
-<script src="runtime/mm_audio.js?v=202610251422"></script>
-<script src="runtime/mm_nbr.js?v=202610251422"></script>
-<script src="runtime/mm_fanending.js?v=202610251422"></script>
+<script src="runtime/mm_core.js?v=202610251424"></script>
+<script src="runtime/mm_interp.js?v=202610251424"></script>
+<script src="runtime/mm_builtins.js?v=202610251424"></script>
+<script src="runtime/mm_audio.js?v=202610251424"></script>
+<script src="runtime/mm_nbr.js?v=202610251424"></script>
+<script src="runtime/mm_fanending.js?v=202610251424"></script>
 
 <!-- generated game package -->
-<script src="game/code.js?v=202610251422"></script>
-<script src="game/sprites.js?v=202610251422"></script>
-<script src="game/objects.js?v=202610251422"></script>
-<script src="game/asset_ids.js?v=202610251422"></script>
-<script src="game/rooms.js?v=202610251422"></script>
-<script src="game/scripts.js?v=202610251422"></script>
-<script src="game/sounds.js?v=202610251422"></script>
-<script src="game/fonts.js?v=202610251422"></script>
-<script src="game/assets.js?v=202610251422"></script>
-<script src="game/tiles.js?v=202610251422"></script>
+<script src="game/code.js?v=202610251424"></script>
+<script src="game/sprites.js?v=202610251424"></script>
+<script src="game/objects.js?v=202610251424"></script>
+<script src="game/asset_ids.js?v=202610251424"></script>
+<script src="game/rooms.js?v=202610251424"></script>
+<script src="game/scripts.js?v=202610251424"></script>
+<script src="game/sounds.js?v=202610251424"></script>
+<script src="game/fonts.js?v=202610251424"></script>
+<script src="game/assets.js?v=202610251424"></script>
+<script src="game/tiles.js?v=202610251424"></script>
 
 <script>
 (function () {
@@ -255,6 +263,7 @@
   stage.addEventListener('dblclick', toggleFs);
   window.addEventListener('keydown', function (e) {
     if (e.keyCode === 70 && !e.ctrlKey && !e.altKey && !e.metaKey) toggleFs(); // F
+    if (e.keyCode === 52 && !e.ctrlKey && !e.altKey && !e.metaKey) applyAspect(MM.aspect === '4:3' ? '16:9' : '4:3'); // 4
     if (e.keyCode === 114) { e.preventDefault(); MM.debugKinds = !MM.debugKinds; } // F3
     if (e.keyCode === 27 && stage.classList.contains('fakefs') && !realFs()) fakeFs(false);
   });
@@ -278,6 +287,22 @@
   // (window_set_fullscreen).  Some browsers reject that API; route the failure
   // to the CSS full-window layout so the result is the same either way.
   MM.onFullscreenFallback = function (on) { fakeFs(!!on); };
+
+  // --- aspect mode (16:9 wide view / 4:3 original) ----------------------
+  var aspectBtn = document.getElementById('aspect');
+  function applyAspect(mode) {
+    MM.setAspect(mode);
+    aspectBtn.textContent = 'Формат: ' + (MM.aspect === '4:3' ? '4:3' : '16:9');
+    try { localStorage.setItem('nbr.aspect', MM.aspect); } catch (e) { /* ignore */ }
+    fit();
+  }
+  aspectBtn.addEventListener('click', function () {
+    applyAspect(MM.aspect === '4:3' ? '16:9' : '4:3');
+    if (this.blur) this.blur();
+  });
+  try {
+    if (localStorage.getItem('nbr.aspect') === '4:3') applyAspect('4:3');
+  } catch (e) { /* ignore */ }
 
 
   // --- full preload ----------------------------------------------------
@@ -347,7 +372,7 @@
     }
     if (hero) pos = ' · x' + Math.round(hero.x) + ' y' + Math.round(hero.y);
     var err = (MM._loopErr ? ' · ОШИБКА: ' + MM._loopErr : '');
-    hud.textContent = MM.state.room.name + ' · ' + MM.state.frame + pos + audio + ' · сборка ' + BUILD + err;
+    hud.textContent = MM.state.room.name + ' · ' + MM.state.frame + pos + audio + ' · ' + (MM.aspect === '4:3' ? '4:3' : '16:9') + ' · сборка ' + BUILD + err;
   }, 250);
 
   // --- audio unlock + start --------------------------------------------
