@@ -1741,6 +1741,32 @@
       xscale: inst.image_xscale, yscale: inst.image_yscale, angle: inst.image_angle,
       alpha: inst.image_alpha, blend: inst.image_blend
     });
+    // Backdrop objects (sky / hills / water) are placed for the authored 320-px
+    // view.  In the wide 16:9 view their art can end inside the screen, which
+    // showed up as a black band on one side and a visible edge on the other.
+    // Extend the outer pixels of the backdrop into the margins so the picture
+    // continues to the screen edge instead of stopping mid-screen.
+    var spr = inst.sprite_index;
+    if (!spr || !spr.frames || inst.depth < 100) return;
+    if ((inst.image_angle || 0) !== 0) return;
+    if (Math.abs(inst.image_xscale) !== 1 || Math.abs(inst.image_yscale) !== 1) return;
+    var av = MM.activeView();
+    var vL = av.x - (av.extra || 0), vR = vL + av.w;
+    var b = MM.bbox(inst);
+    if (!b || b.b < av.y || b.t > av.y + av.h) return;
+    var cv = buildSpriteCanvas(spr, inst.image_index);
+    if (!cv || cv.width < 200) return;
+    var gapL = b.l - vL, gapR = vR - b.r;
+    var strip = 4;
+    var prevAlpha = ctx.globalAlpha;
+    ctx.globalAlpha = Math.max(0, Math.min(1, (inst.image_alpha == null ? 1 : inst.image_alpha) * prevAlpha));
+    if (gapL > 1) {
+      ctx.drawImage(cv, 0, 0, strip, cv.height, vL, b.t, gapL, b.b - b.t);
+    }
+    if (gapR > 1) {
+      ctx.drawImage(cv, cv.width - strip, 0, strip, cv.height, b.r, b.t, gapR, b.b - b.t);
+    }
+    ctx.globalAlpha = prevAlpha;
   };
 
   var KIND_COLORS = {
