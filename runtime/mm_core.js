@@ -1003,6 +1003,26 @@
         inst.x = inst._px;
         MM.globals.vel = 0;
       }
+      // Overlapping wall tiles (seams/corners) could leave no valid previous
+      // position: search the nearest free spot so the hero can never stay
+      // wedged inside geometry.
+      if (overlapsLevelSolid(inst, inst.x, inst.y)) {
+        for (var r = 1; r <= 24; r++) {
+          var moved = false;
+          var dirs = [[-r, 0], [r, 0], [0, -r], [0, r]];
+          for (var di = 0; di < dirs.length; di++) {
+            var nx = inst.x + dirs[di][0], ny = inst.y + dirs[di][1];
+            if (!overlapsLevelSolid(inst, nx, ny)) {
+              inst.x = nx; inst.y = ny;
+              inst.vspeed = 0;
+              MM.globals.vel = 0;
+              moved = true;
+              break;
+            }
+          }
+          if (moved) break;
+        }
+      }
     }
     separatePlayerSides();
   }
