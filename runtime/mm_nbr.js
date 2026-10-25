@@ -1404,13 +1404,37 @@
   var preloadQueue = null;    // onDone callbacks while a run is in progress
   var preloadGuardMs = 30000;
 
-  function collectPreloadJobs() {
-    var jobs = [], seen = Object.create(null), n, d, i, f;
+  // Minimal set for the first screens (language -> title -> JKN -> SEGA);
+  // everything else streams in the background while those screens play.
+  MM.PRELOAD_BOOT_ROOMS = ['LanguageSelect_19', 'TitleScreen_3', 'JKN_0', 'SEGA_2', 'DataSelect_5'];
 
-    // 1. every sprite frame (full preload, as requested)
+  function bootSpriteSet() {
+    var set = Object.create(null);
+    var rooms = MM.PRELOAD_BOOT_ROOMS || [];
+    for (var r = 0; r < rooms.length; r++) {
+      var room = MM.rooms[rooms[r]];
+      if (!room) continue;
+      var inst = room.instances || [];
+      for (var i = 0; i < inst.length; i++) {
+        var def = MM.objects[inst[i].obj];
+        if (!def) continue;
+        if (def.sprite && def.sprite.name) set[def.sprite.name] = 1;
+        if (def.mask && def.mask.name) set[def.mask.name] = 1;
+      }
+    }
+    return set;
+  }
+
+  function collectPreloadJobs(phase) {
+    var jobs = [], seen = Object.create(null), n, d, i, f;
+    phase = phase || 'all';
+    var bootSet = phase === 'boot' ? bootSpriteSet() : null;
+
+    // 1. sprite frames (phase 'rest' only fills what is still missing)
     for (n in MM.sprites) {
       d = MM.sprites[n];
       if (!d || d.kind !== 'image' || !d.frames) continue;
+      if (phase === 'boot' && !bootSet[n]) continue;
       for (i = 0; i < d.frames.length; i++) {
         f = d.frames[i];
         if (!f || f.img || !f.src || seen['f' + f.src]) continue;
@@ -1419,35 +1443,47 @@
       }
     }
 
-    // 2. every pixel mask (heroes and anything with maskKind "mask")
-    for (n in MM.sprites) {
-      d = MM.sprites[n];
-      if (!d || !d.mask || seen['m' + d.mask]) continue;
-      seen['m' + d.mask] = 1;
-      jobs.push({ kind: 'mask', src: d.mask });
+    // 2. pixel masks (needed for precise collisions; cheap files)
+    if (phase !== 'rest') {
+      for (n in MM.sprites) {
+        d = MM.sprites[n];
+        if (!d || !d.mask || seen['m' + d.mask]) continue;
+        seen['m' + d.mask] = 1;
+        jobs.push({ kind: 'mask', src: d.mask });
+      }
     }
 
     // 3. backgrounds
-    for (n in MM.bgImages) {
-      var url = MM.bgImages[n];
-      if (url && url.src) url = url.src;
-      if (!url || seen['b' + url]) continue;
-      seen['b' + url] = 1;
-      jobs.push({ kind: 'bg', src: url });
+    if (phase !== 'rest') {
+      for (n in MM.bgImages) {
+        var url = MM.bgImages[n];
+        if (url && url.src) url = url.src;
+        if (!url || seen['b' + url]) continue;
+        seen['b' + url] = 1;
+        jobs.push({ kind: 'bg', src: url });
+      }
     }
 
-    // 4. bitmap fonts (otherwise the first dialog/HUD text pops in late)
-    var fonts = MM.fonts || {};
-    for (n in fonts) {
-      var fnt = fonts[n];
-      if (!fnt || !fnt.src || fnt.img || seen['fnt' + fnt.src]) continue;
-      seen['fnt' + fnt.src] = 1;
-      jobs.push({ kind: 'font', src: fnt.src, obj: fnt });
+    // 4. bitmap fonts
+    if (phase !== 'rest') {
+      var fonts = MM.fonts || {};
+      for (n in fonts) {
+        var fnt = fonts[n];
+        if (!fnt || !fnt.src || fnt.img || seen['fnt' + fnt.src]) continue;
+        seen['fnt' + fnt.src] = 1;
+        jobs.push({ kind: 'font', src: fnt.src, obj: fnt });
+      }
     }
 
-    // 5. audio: every sound is prefetched up front (full preload)
+    // 5. audio: boot gets the common stingers, background pass gets the rest
     var sounds = MM.soundFiles || {};
+    var common = Object.create(null);
+    if (phase === 'boot') {
+      var cl = MM.PRELOAD_SOUNDS || [];
+      for (i = 0; i < cl.length; i++) common[cl[i]] = 1;
+    }
     for (n in sounds) {
+      if (phase === 'boot' && !common[n]) continue;
       var def = sounds[n];
       if (!def || !def.src || seen['s' + def.src]) continue;
       seen['s' + def.src] = 1;
@@ -1461,9 +1497,12 @@
     opts = opts || {};
     var onProgress = opts.onProgress || function () {};
     var onDone = opts.onDone || function () {};
+    var phase = opts.phase || 'all';
 
-    if (MM.preloadedAll) { onDone({ skipped: true }); return; }
-    if (preloadQueue) { preloadQueue.push(onDone); return; }
+    if (phase !== 'rest') {
+      if (MM.preloadedAll) { onDone({ skipped: true }); return; }
+      if (preloadQueue) { preloadQueue.push(onDone); return; }
+    }
     preloadQueue = [onDone];
     MM.preloadAllUsed = true;
 
@@ -1474,7 +1513,7 @@
       return;
     }
 
-    var jobs = collectPreloadJobs();
+    var jobs = collectPreloadJobs(phase);
     var total = jobs.length;
     var width = Math.max(1, Math.min(8, opts.concurrency || 8));
     var next = 0, done = 0, failed = 0, finishedFlag = false;
@@ -1485,7 +1524,8 @@
     function finish() {
       if (finishedFlag) return;
       finishedFlag = true;
-      MM.preloadedAll = true;
+      if (phase !== 'rest') MM.preloadedAll = true;
+      else MM.backgroundLoaded = true;
       MM.preloadStats.finished = true;
       var list = preloadQueue || [];
       preloadQueue = null;

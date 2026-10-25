@@ -9,7 +9,7 @@
 // Build sync: a stale cached index is the usual "works for him, not for me"
 // case.  Ask the server for the current stamp and reload once onto it.
 (function () {
-  var cur = '20261025153100';
+  var cur = '20261025153742';
   if (!cur || cur.charAt(0) === '_') return;
   try {
     var x = new XMLHttpRequest();
@@ -188,24 +188,24 @@
 </script>
 
 <!-- runtime -->
-<script src="runtime/mm_core.js?v=20261025153100"></script>
-<script src="runtime/mm_interp.js?v=20261025153100"></script>
-<script src="runtime/mm_builtins.js?v=20261025153100"></script>
-<script src="runtime/mm_audio.js?v=20261025153100"></script>
-<script src="runtime/mm_nbr.js?v=20261025153100"></script>
-<script src="runtime/mm_fanending.js?v=20261025153100"></script>
+<script src="runtime/mm_core.js?v=20261025153742"></script>
+<script src="runtime/mm_interp.js?v=20261025153742"></script>
+<script src="runtime/mm_builtins.js?v=20261025153742"></script>
+<script src="runtime/mm_audio.js?v=20261025153742"></script>
+<script src="runtime/mm_nbr.js?v=20261025153742"></script>
+<script src="runtime/mm_fanending.js?v=20261025153742"></script>
 
 <!-- generated game package -->
-<script src="game/code.js?v=20261025153100"></script>
-<script src="game/sprites.js?v=20261025153100"></script>
-<script src="game/objects.js?v=20261025153100"></script>
-<script src="game/asset_ids.js?v=20261025153100"></script>
-<script src="game/rooms.js?v=20261025153100"></script>
-<script src="game/scripts.js?v=20261025153100"></script>
-<script src="game/sounds.js?v=20261025153100"></script>
-<script src="game/fonts.js?v=20261025153100"></script>
-<script src="game/assets.js?v=20261025153100"></script>
-<script src="game/tiles.js?v=20261025153100"></script>
+<script src="game/code.js?v=20261025153742"></script>
+<script src="game/sprites.js?v=20261025153742"></script>
+<script src="game/objects.js?v=20261025153742"></script>
+<script src="game/asset_ids.js?v=20261025153742"></script>
+<script src="game/rooms.js?v=20261025153742"></script>
+<script src="game/scripts.js?v=20261025153742"></script>
+<script src="game/sounds.js?v=20261025153742"></script>
+<script src="game/fonts.js?v=20261025153742"></script>
+<script src="game/assets.js?v=20261025153742"></script>
+<script src="game/tiles.js?v=20261025153742"></script>
 
 <script>
 (function () {
@@ -371,6 +371,7 @@
   function mb(n) { return (n / 1048576).toFixed(1) + ' МБ'; }
 
   MM.preloadAll({
+    phase: 'boot',
     concurrency: 8,
     onProgress: function (p) {
       if (!p.total) return;
@@ -385,14 +386,16 @@
     onDone: function (r) {
       ready = true;
       prebar.style.width = '100%';
-      pretext.textContent = 'Всё загружено' + (r && r.failed ? ' (кроме ' + r.failed + ' файлов)' : '');
+      pretext.textContent = 'Быстрый старт готов' + (r && r.failed ? ' (кроме ' + r.failed + ' файлов)' : '');
       hint.className = 'ready';
       hint.textContent = 'Нажми, чтобы включить звук и начать';
-      if (bootText) bootText.textContent = 'Всё загружено: ' + (r && r.total ? r.total : '') + ' ассетов';
+      if (bootText) bootText.textContent = 'Быстрый старт готов: ' + (r && r.total ? r.total : '') + ' ассетов';
       bootHide();
-      // Audio decoding starts only after the user gesture (start()), not while
-      // the loading screen is still visible: decoding everything there froze
-      // slower machines before the game even began.
+      // Everything else (the other rooms' sprites and long audio) streams in
+      // the background while the menus/intro play; it never blocks the game.
+      setTimeout(function () {
+        try { MM.preloadAll({ phase: 'rest', concurrency: 2, onDone: function () {} }); } catch (e) { /* ignore */ }
+      }, 400);
     }
   });
 
