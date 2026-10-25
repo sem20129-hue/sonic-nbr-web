@@ -888,6 +888,38 @@
   }
   MM.isLevelSolid = isLevelSolid;
 
+  // Semantic kinds for level objects: floor / wall / ceiling / break / slope /
+  // bridge / hazard.  Used by the debug overlay and by the QA bot; the physics
+  // still uses the real masks.
+  MM.kindOf = function (o) {
+    if (!o) return 'other';
+    var n = o.object_name || '';
+    if (/Fire|Flame|Spike|Buzz|Laser|Lazer|Traktor|Saw|Bomb|Mine|SpikeBall|Lava/i.test(n)) return 'hazard';
+    if (MM.maskSparseFor && MM.maskSparseFor(o)) return 'bridge';
+    var def = o.object_index;
+    var bm = MM.objects['Break_Mask'];
+    if (bm && MM.objectChainHas(def, bm)) return 'break';
+    if (MM.objects['objSlopeParent1'] && MM.objectChainHas(def, MM.objects['objSlopeParent1'])) return 'slope';
+    var b = MM.bbox(o);
+    if (!b) return 'other';
+    var w = b.r - b.l + 1, h = b.b - b.t + 1;
+    if (w >= h * 2) return 'floor';
+    if (h >= w * 2) return 'wall';
+    return 'block';
+  };
+
+  // Kind relative to a hero: wide solids above are ceilings, below are floors,
+  // beside are walls.  This is what the overlay labels.
+  MM.kindNear = function (o, hero) {
+    var k = MM.kindOf(o);
+    if (k !== 'floor' && k !== 'block' && k !== 'wall') return k;
+    var b = MM.bbox(o), hb = hero && MM.bbox(hero);
+    if (!b || !hb) return k;
+    if (b.t >= hb.b - 4) return 'floor';
+    if (b.b <= hb.t + 4) return 'ceiling';
+    return 'wall';
+  };
+
   // Static-ish list of level geometry, rebuilt only when instances are created
   // or destroyed (not every frame).  Contact queries used to scan all 1800+
   // instances on every ground probe.
@@ -1620,8 +1652,54 @@
     });
   };
 
-  MM.renderFrame = function () {
-    var ctx = MM.ctx;
+  var KIND_COLORS = {
+    floor: '#39ff6a', wall: '#4aa3ff', ceiling: '#b06bff', block: '#8a8a9a',
+    break: '#ff3b3b', hazard: '#ff9f1c', slope: '#ffe14d', bridge: '#00e5ff'
+  };
+
+  function drawKindOverlay(ctx, vx, vy, vw, vh) {
+    var hero = null, i;
+    for (i = 0; i < MM.state.instances.length; i++) {
+      var hi = MM.state.instances[i];
+      if (!hi._destroyed && hi.object_index && MM.objectChainHas(hi.object_index, MM.objects['Pers_Obj'])) { hero = hi; break; }
+    }
+    ctx.save();
+    ctx.lineWidth = 1;
+    for (i = 0; i < MM.state.instances.length; i++) {
+      var o = MM.state.instances[i];
+      if (o._destroyed || o._deactivated) continue;
+      if (!MM.isLevelSolid(o.object_index) && MM.kindOf(o) === 'other') continue;
+      var k = MM.kindNear(o, hero);
+      if (k === 'other') continue;
+      var b = MM.bbox(o);
+      if (!b) continue;
+      if (b.r < vx - 64 || b.l > vx + vw + 64 || b.b < vy - 64 || b.t > vy + vh + 64) continue;
+      ctx.globalAlpha = 0.85;
+      ctx.strokeStyle = KIND_COLORS[k] || '#ffffff';
+      ctx.strokeRect(b.l + 0.5, b.t + 0.5, Math.max(1, b.r - b.l), Math.max(1, b.b - b.t));
+    }
+    ctx.restore();
+  }
+
+  function drawKindLegend(ctx) {
+    var items = [['floor', 'пол'], ['wall', 'стена'], ['ceiling', 'потолок'],
+                 ['break', 'ломаемая'], ['hazard', 'опасность'], ['slope', 'склон'],
+                 ['bridge', 'мост']];
+    ctx.save();
+    ctx.font = '11px monospace';
+    ctx.textAlign = 'left';
+    var y = MM.VIEW_H - 9;
+    for (var i = 0; i < items.length; i++) {
+      var x = 8 + i * 118;
+      ctx.fillStyle = KIND_COLORS[items[i][0]];
+      ctx.fillRect(x, y - 8, 8, 8);
+      ctx.fillStyle = '#dddddd';
+      ctx.fillText(items[i][1], x + 11, y);
+    }
+    ctx.restore();
+  }
+
+  MM.renderFrame = function () {    var ctx = MM.ctx;
     if (!ctx) return;
     var room = MM.state.room;
     if (!room) return;
@@ -1700,6 +1778,7 @@
     }
     while (tIdx < tileDraw.length) drawRoomTile(ctx, tileDraw[tIdx++]);
     if (MM.gfx.drawBackgrounds) MM.gfx.drawBackgrounds(ctx, room, vx, vy, true);
+    if (MM.debugKinds) drawKindOverlay(ctx, vx, vy, vw, vh);
     ctx.restore();
 
     // GUI-слой
@@ -1713,6 +1792,7 @@
     }
     ctx.restore();
     MM.gfxCtx = null;
+    if (MM.debugKinds) drawKindLegend(ctx);
 
     // Эффекты поверх
     var fx = MM.fx;
