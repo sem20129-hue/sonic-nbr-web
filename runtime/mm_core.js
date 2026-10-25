@@ -1850,8 +1850,10 @@
     if (!MM.globals) MM.globals = {};
     MM.globals.HUD_Wide = view.w;
     // Dialogue panels (SW) are 380 px wide, wider than the 320-px frame they
-    // were authored for: centre that width so the "Enter" tab is never cut.
-    MM.globals.HUD_Dlg = Math.max(0, (view.w - 380) / 2);
+    // were authored for.  Stretch/shrink the panel to the visible width so it
+    // always fills the screen and the "Enter" tab is never cut.
+    MM.globals.HUD_Dlg = 0;
+    MM.globals.HUD_DlgScale = view.w / 380;
     var sx = Math.round(MM.fx.shakeX), sy = Math.round(MM.fx.shakeY);
     var drawables = MM.state.instances
       .filter(function (i) { return !i._destroyed && !i._deactivated && i.visible; })

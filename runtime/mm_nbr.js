@@ -1835,6 +1835,27 @@
     MM.scripts['KnucklesAction'] = s;
   }
 
+  // Cutscene dialogue: SW advances on keyboard_check_pressed(vk_enter) with no
+  // debounce.  A held/repeated Enter (or a fast key repeat from the OS) could
+  // advance many pages in a single frame -- each page fires cutscene alarms and
+  // instance_create chains, which ended in a frozen frame.  One advance per 3
+  // steps is still instant for a human but cannot cascade.
+  function patchDialogAdvance() {
+    var b = MM.codeBundle;
+    if (!b) return;
+    var key = 'gml_Object_SW_Step_0';
+    var s = b[key];
+    if (typeof s !== 'string' || s.indexOf('// dialog debounce') >= 0) return;
+    var inKey = 'if (keyboard_check_pressed(vk_enter))\n{';
+    if (s.indexOf(inKey) < 0) return;
+    s = s.replace(inKey,
+      'if (keyboard_check_pressed(vk_enter) && (!_advCd || _advCd <= 0))\n' +
+      '{\n' +
+      '    _advCd = 6;');
+    s = 'if (_advCd > 0) _advCd -= 1;\n' + s + '\n// dialog debounce';
+    b[key] = s;
+  }
+
   function patchKeyboardEvents() {
     var objs = MM.objects || {};
     for (var name in objs) {
@@ -1874,10 +1895,20 @@
       var sw = b[key];
       if (typeof sw === 'string' && sw.indexOf('// wide fixed') < 0) {
         // The dialogue panel sprite is 380 px wide (portrait + text + "Enter"),
-        // wider than the 320-px view it was authored for.  Centre that width in
-        // the wide view instead of centring 320, otherwise the panel runs off
-        // the right edge and the "Enter" tab gets cut.
-        b[key] = sw.replace(/view_xview\[0\]/g, '(view_xview[0] + (global.HUD_Dlg || 0))') + '\n// wide fixed';
+        // wider than the 320-px view it was authored for, so it used to be cut
+        // at the right edge.  Stretch it to the visible width (global.HUD_DlgScale)
+        // so the panel fills the screen and the "Enter" tab is always visible.
+        sw = sw.replace(/view_xview\[0\]/g, '(view_xview[0] + (global.HUD_Dlg || 0))');
+        sw = sw.replace(
+          /draw_sprite\((sprSW\w+), 1, \(view_xview\[0\] \+ \(global\.HUD_Dlg \|\| 0\)\), view_yview\[0\]\)/g,
+          'draw_sprite_ext($1, 1, (view_xview[0] + (global.HUD_Dlg || 0)), view_yview[0], global.HUD_DlgScale, 1, 0, c_white, 1)');
+        // The text sits inside the stretched panel: scale its inset too, or it
+        // would start on top of the portrait.
+        sw = sw.replace(/\+ 100, view_yview\[0\] \+ 5/g,
+          '+ 100 * (global.HUD_DlgScale || 1), view_yview[0] + 5');
+        sw = sw.replace(/\+ 120, view_yview\[0\] \+ 10/g,
+          '+ 120 * (global.HUD_DlgScale || 1), view_yview[0] + 10');
+        b[key] = sw + '\n// wide fixed';
       }
       // Metal Sonic / Exetior entrance: the spawn was x +-200, which was just
       // off-screen in a 320-wide view but inside the 463-wide one (pop-in).
@@ -1927,6 +1958,7 @@
     patchKeyboardEvents();
     patchKnucklesClimb();
     patchGlideTurn();
+    patchDialogAdvance();
     patchWideUI();
     opts = opts || {};
     MM.VIEW_W = opts.width || 640;
