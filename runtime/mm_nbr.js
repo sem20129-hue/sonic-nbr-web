@@ -350,13 +350,18 @@
   }
 
   // Is the world pixel (px,py) inside this instance's sprite mask?
-  function maskContains(inst, spr, m, px, py) {
+  // `ix`/`iy` override the instance origin for probe tests (place_meeting at an
+  // offset), which previously ignored the probe position and made precise
+  // masks miss one pixel above the floor (visible standing jitter).
+  function maskContains(inst, spr, m, px, py, ix, iy) {
     if (!m) return true;
     var ox = spr.originPx ? spr.originPx[0] : 0;
     var oy = spr.originPx ? spr.originPx[1] : 0;
     var sx = inst.image_xscale || 1;
     var sy = inst.image_yscale || 1;
-    var lx = Math.floor((px - inst.x) / (sx || 1) + ox);
+    var bx = ix === undefined ? inst.x : ix;
+    var by = iy === undefined ? inst.y : iy;
+    var lx = Math.floor((px - bx) / (sx || 1) + ox);
     var ly = Math.floor((py - inst.y) / (sy || 1) + oy);
     if (lx < 0 || ly < 0 || lx >= m.w || ly >= m.h) return false;
     var i = (ly * m.w + lx) * 4;
@@ -366,14 +371,16 @@
 
 
   // Does this instance's mask have any opaque pixel inside the world box?
-  function maskHitsBox(inst, spr, m, box) {
+  function maskHitsBox(inst, spr, m, box, ix, iy) {
     if (!m.rows) return true;
     var ox = spr.originPx ? spr.originPx[0] : 0;
     var oy = spr.originPx ? spr.originPx[1] : 0;
     var sx = inst.image_xscale || 1;
     var sy = inst.image_yscale || 1;
-    var ly0 = Math.floor((box.t - inst.y) / (sy || 1) + oy);
-    var ly1 = Math.ceil((box.b - inst.y) / (sy || 1) + oy);
+    var bx = ix === undefined ? inst.x : ix;
+    var by = iy === undefined ? inst.y : iy;
+    var ly0 = Math.floor((box.t - by) / (sy || 1) + oy);
+    var ly1 = Math.ceil((box.b - by) / (sy || 1) + oy);
     // Mirrored/negative scale flips the row and run order; normalise before
     // clamping, otherwise looking left made the whole mask test miss.
     if (ly0 > ly1) { var ty = ly0; ly0 = ly1; ly1 = ty; }
@@ -383,16 +390,16 @@
       var runs = m.rows[ly];
       if (!runs || !runs.length) continue;
       for (var i = 0; i < runs.length; i++) {
-        var wx0 = inst.x + (runs[i][0] - ox) * sx;
-        var wx1 = inst.x + (runs[i][1] + 1 - ox) * sx;
+        var wx0 = bx + (runs[i][0] - ox) * sx;
+        var wx1 = bx + (runs[i][1] + 1 - ox) * sx;
         if (wx0 > wx1) { var tx = wx0; wx0 = wx1; wx1 = tx; }
-        if (wx0 < box.r && wx1 > box.l) return true;
+        if (wx0 <= box.r && wx1 >= box.l) return true;
       }
     }
     return false;
   }
 
-  MM.collides = function (a, b, boxA, boxB) {
+  MM.collides = function (a, b, boxA, boxB, ax, ay, bx2, by2) {
     if (!(boxA.l <= boxB.r && boxA.r >= boxB.l && boxA.t <= boxB.b && boxA.b >= boxB.t)) return false;
     var sprA = a.mask_index || a.sprite_index, sprB = b.mask_index || b.sprite_index;
     var mA = null, mB = null;
@@ -401,16 +408,16 @@
     var mb = maskHit(sprB);
     if (mb && mb.precise) mB = mb;
     if (!mA && !mB) return true;
-    if (mA && !mB) return maskHitsBox(a, sprA, mA, boxB);
-    if (mB && !mA) return maskHitsBox(b, sprB, mB, boxA);
+    if (mA && !mB) return maskHitsBox(a, sprA, mA, boxB, ax, ay);
+    if (mB && !mA) return maskHitsBox(b, sprB, mB, boxA, bx2, by2);
     var l = Math.max(boxA.l, boxB.l), r = Math.min(boxA.r, boxB.r);
     var t = Math.max(boxA.t, boxB.t), bo = Math.min(boxA.b, boxB.b);
     var step = ((r - l) * (bo - t) > 40000) ? 2 : 1;
     for (var x = l; x < r; x += step) {
       for (var y = t; y < bo; y += step) {
-        var inA = mA ? maskContains(a, sprA, mA, x, y) : (x >= boxA.l && x < boxA.r && y >= boxA.t && y < boxA.b);
+        var inA = mA ? maskContains(a, sprA, mA, x, y, ax, ay) : (x >= boxA.l && x < boxA.r && y >= boxA.t && y < boxA.b);
         if (!inA) continue;
-        var inB = mB ? maskContains(b, sprB, mB, x, y) : (x >= boxB.l && x < boxB.r && y >= boxB.t && y < boxB.b);
+        var inB = mB ? maskContains(b, sprB, mB, x, y, bx2, by2) : (x >= boxB.l && x < boxB.r && y >= boxB.t && y < boxB.b);
         if (inB) return true;
       }
     }
@@ -1581,6 +1588,32 @@
       '    audio_play_sound(SFX_Ring, 1, false);\n    if (Time >= 4) { Act = 4; } // sega fixed');
   }
 
+  // Knuckles can only grab a wall from the wall block at the bottom of his
+  // collision events, but the ground block at the top of the same event clears
+  // `Glide` first whenever a wall stands beside the body -- the grab could
+  // never run.  While gliding/climbing, ignore the ground probe when a side
+  // wall is present (a real floor landing has no wall at bbox+-1).
+  function patchKnucklesClimb() {
+    var b = MM.codeBundle;
+    if (!b) return;
+    var pairs = [
+      ['gml_Object_Knuckles_Collision_20', 'Solid_Mask'],
+      ['gml_Object_Knuckles_Collision_21', 'Break_Mask']
+    ];
+    for (var i = 0; i < pairs.length; i++) {
+      var key = pairs[i][0], mask = pairs[i][1];
+      var src = b[key];
+      if (typeof src !== 'string') continue;
+      if (src.indexOf('// climb fixed') >= 0) continue;
+      var needle = 'if (place_meeting(x, bbox_bottom + 1, ' + mask + ') && (vspeed >= 0))';
+      if (src.indexOf(needle) < 0) continue;
+      var side = '(place_meeting(bbox_right + 1, y, ' + mask + ') || place_meeting(bbox_left - 1, y, ' + mask + '))';
+      var repl = 'if (place_meeting(x, bbox_bottom + 1, ' + mask + ') && (vspeed >= 0) && ' +
+                 '(((Glide == 0) && (Climb == 0) && (Climb2 == 0)) || !' + side + ')) // climb fixed';
+      b[key] = src.replace(needle, repl);
+    }
+  }
+
   function patchKeyboardEvents() {
     var objs = MM.objects || {};
     for (var name in objs) {
@@ -1601,6 +1634,7 @@
     patchBirdFacing();
     patchSegaCheat();
     patchKeyboardEvents();
+    patchKnucklesClimb();
     opts = opts || {};
     MM.VIEW_W = opts.width || 640;
     MM.VIEW_H = opts.height || 480;

@@ -84,6 +84,11 @@
     var vh = MM.view.hview[idx] || MM.VIEW_H;
     var pw = MM.view.portW[idx] || MM.VIEW_W;
     var ph = MM.view.portH[idx] || MM.VIEW_H;
+    // A few rooms (JKN_0) declare a 1024x768 port.  Drawn oversized it lost the
+    // right third of the logo; the port must fit the 640x480 application
+    // surface, exactly like a 640x480 GM window would.
+    if (pw > MM.VIEW_W) pw = MM.VIEW_W;
+    if (ph > MM.VIEW_H) ph = MM.VIEW_H;
     return {
       index: idx,
       x: MM.view.xview[idx] || 0,
@@ -668,7 +673,7 @@
     var def = typeof objValue === 'string' ? MM.objects[objValue] : objValue;
     return eachOverlapping(def, list, selfBox, function (o, ob) {
       if (notme !== false && o === who) return false;
-      return MM.collides ? MM.collides(who, o, selfBox, ob) : boxesOverlap(selfBox, ob);
+      return MM.collides ? MM.collides(who, o, selfBox, ob, x, y) : boxesOverlap(selfBox, ob);
     });
   };
 
@@ -681,7 +686,7 @@
     var found = MM.NOONE;
     eachOverlapping(def, list, selfBox, function (o, ob) {
       if (o === who) return false;
-      if (MM.collides ? MM.collides(who, o, selfBox, ob) : boxesOverlap(selfBox, ob)) {
+      if (MM.collides ? MM.collides(who, o, selfBox, ob, x, y) : boxesOverlap(selfBox, ob)) {
         found = o;
         return true;
       }
@@ -930,11 +935,20 @@
   // pixel side clearance before collision events run, so the game never sees a
   // zero-pixel wall contact as ground.  Only shallow horizontal contacts are
   // touched: ledges keep their vertical landing.
+  // States where touching a wall is meaningful to the original scripts
+  // (glide->climb, punch, tornado, rolling/spindash wall breaking).  Those
+  // need the real collision event, so the wall clearance must not run.
+  function wallInteraction(p) {
+    return !!(p.Punch || p.Glide || p.Climb || p.Climb2 || p.Tornado_Mode ||
+              p.rolling || p.spindash);
+  }
+
   function separatePlayerSides() {
     var list = MM.state.instances;
     for (var j = 0; j < list.length; j++) {
       var p = list[j];
       if (p._destroyed || p._deactivated || !isPlayerInst(p)) continue;
+      if (wallInteraction(p)) continue;
       var pb = MM.bbox(p);
       if (!pb) continue;
       var solids = MM.levelSolids();
@@ -1120,8 +1134,11 @@
           }
         }
       }
-      MM.view.xview[i] = Math.max(0, Math.min(vx, Math.max(0, room.w - w)));
-      MM.view.yview[i] = Math.max(0, Math.min(vy, Math.max(0, room.h - h)));
+      // GM draws in integer pixels; keeping the view fractional made every
+      // HUD element that compensates with view_xview (SCORE/TIME/RINGS) shift
+      // by one pixel every few frames while walking.  Snap the camera instead.
+      MM.view.xview[i] = Math.round(Math.max(0, Math.min(vx, Math.max(0, room.w - w))));
+      MM.view.yview[i] = Math.round(Math.max(0, Math.min(vy, Math.max(0, room.h - h))));
     }
   }
 
@@ -1805,10 +1822,24 @@
     if (opts.autostart !== false && typeof requestAnimationFrame !== 'undefined') {
       var acc = 0, last = (typeof performance !== 'undefined' ? performance.now() : Date.now());
       var stepMs = 1000 / MM.FPS;
+      // Coming back from a hidden tab must not fast-forward the game: the old
+      // 250 ms clamp still ran five steps every frame until the backlog was
+      // gone (and could break timers/alarms).  Drop stale time instead.
+      var syncClock = function () {
+        last = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+        acc = 0;
+      };
+      if (typeof document !== 'undefined' && document.addEventListener) {
+        document.addEventListener('visibilitychange', syncClock);
+      }
+      if (typeof window !== 'undefined' && window.addEventListener) {
+        window.addEventListener('blur', syncClock);
+        window.addEventListener('focus', syncClock);
+      }
       var loop = function (t) {
         if (!MM.state.running) return;
         var dt = t - last; last = t;
-        if (dt > 250) dt = 250;
+        if (!(dt > 0) || dt > 250) dt = stepMs;
         acc += dt;
         var guard = 0;
         while (acc >= stepMs && guard++ < 5) {
