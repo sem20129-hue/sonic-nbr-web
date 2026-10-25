@@ -145,24 +145,24 @@
 </script>
 
 <!-- runtime -->
-<script src="runtime/mm_core.js?v=202610251252"></script>
-<script src="runtime/mm_interp.js?v=202610251252"></script>
-<script src="runtime/mm_builtins.js?v=202610251252"></script>
-<script src="runtime/mm_audio.js?v=202610251252"></script>
-<script src="runtime/mm_nbr.js?v=202610251252"></script>
-<script src="runtime/mm_fanending.js?v=202610251252"></script>
+<script src="runtime/mm_core.js?v=202610251307"></script>
+<script src="runtime/mm_interp.js?v=202610251307"></script>
+<script src="runtime/mm_builtins.js?v=202610251307"></script>
+<script src="runtime/mm_audio.js?v=202610251307"></script>
+<script src="runtime/mm_nbr.js?v=202610251307"></script>
+<script src="runtime/mm_fanending.js?v=202610251307"></script>
 
 <!-- generated game package -->
-<script src="game/code.js?v=202610251252"></script>
-<script src="game/sprites.js?v=202610251252"></script>
-<script src="game/objects.js?v=202610251252"></script>
-<script src="game/asset_ids.js?v=202610251252"></script>
-<script src="game/rooms.js?v=202610251252"></script>
-<script src="game/scripts.js?v=202610251252"></script>
-<script src="game/sounds.js?v=202610251252"></script>
-<script src="game/fonts.js?v=202610251252"></script>
-<script src="game/assets.js?v=202610251252"></script>
-<script src="game/tiles.js?v=202610251252"></script>
+<script src="game/code.js?v=202610251307"></script>
+<script src="game/sprites.js?v=202610251307"></script>
+<script src="game/objects.js?v=202610251307"></script>
+<script src="game/asset_ids.js?v=202610251307"></script>
+<script src="game/rooms.js?v=202610251307"></script>
+<script src="game/scripts.js?v=202610251307"></script>
+<script src="game/sounds.js?v=202610251307"></script>
+<script src="game/fonts.js?v=202610251307"></script>
+<script src="game/assets.js?v=202610251307"></script>
+<script src="game/tiles.js?v=202610251307"></script>
 
 <script>
 (function () {
@@ -306,13 +306,12 @@
     }
   });
 
-  // Safety valve: a dead asset must not lock the player out forever.
+  // No early start: running with sprites/masks still in flight made collisions
+  // fall back to bounding boxes, which looks like random physics bugs.
   setTimeout(function () {
     if (ready) return;
     hint.className = 'wait';
-    hint.textContent = 'Долго? Нажми, чтобы начать не дожидаясь полной загрузки';
-    hint.style.cursor = 'pointer';
-    hint.addEventListener('click', function (e) { e.stopPropagation(); ready = true; start(); });
+    hint.textContent = 'Загрузка ассетов идёт дольше обычного — ждём полного прелоада';
   }, 45000);
 
   // --- hud -------------------------------------------------------------

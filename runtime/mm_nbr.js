@@ -1621,7 +1621,24 @@
       src = src.replace(new RegExp('collision_rectangle\\(x, y, bbox_left - 1, y, ' + mask + ', 1, 0\\)', 'g'), 'collision_rectangle(x, y, bbox_left - 3, y, ' + mask + ', 1, 0)');
       b[key] = src;
     }
-    // The climb movement itself lives in the KnucklesAction script.
+    // Solid_Line walls (pipes / thin steel) had no climb trigger at all: the
+    // Knuckles collision event only existed for Solid_Mask/Break_Mask.  Add
+    // the same grab, and let the ground branch not cancel the glide beside it.
+    var k22 = 'gml_Object_Knuckles_Collision_22';
+    var s22 = b[k22];
+    if (typeof s22 === 'string' && s22.indexOf('// line grab fixed') < 0) {
+      var need22 = 'if (place_meeting(x, bbox_bottom + 1, Solid_Line) && (vspeed >= 0))';
+      var side22 = '(place_meeting(bbox_right + 3, y, Solid_Line) || place_meeting(bbox_left - 3, y, Solid_Line))';
+      if (s22.indexOf(need22) >= 0) {
+        s22 = s22.replace(need22,
+          'if (place_meeting(x, bbox_bottom + 1, Solid_Line) && (vspeed >= 0) && ' +
+          '(((Glide == 0) && (Climb == 0) && (Climb2 == 0)) || !' + side22 + ')) // line grab fixed');
+      }
+      s22 += '\n// line grab fixed\nif (Pers_Obj.Tornado_Mode == 0 && (place_meeting(bbox_right + 3, y, Solid_Line) || place_meeting(bbox_left - 3, y, Solid_Line))) { if (Glide == 1) { audio_play_sound(SFX_Grab, 0, false); Climb = 1; Glide = 0; } spindash = 0; canJump = 0; Act = 0; Hang = 0; Grav = 1; drawAngle = 0; rolling = 0; global.vel = 0; }';
+      b[k22] = s22;
+    }
+    // Climb motion must recognise Solid_Line walls too (otherwise x++ pushes
+    // the hero into the pipe while hanging).
     var act = MM.scripts && MM.scripts['KnucklesAction'];
     if (typeof act === 'string') {
       var out = act;
@@ -1629,6 +1646,14 @@
         'collision_rectangle(x, y, bbox_right + 3, y, $1, 1, 0)');
       out = out.replace(/collision_rectangle\(x, y, bbox_left - 1, y, (Solid_Mask|Break_Mask), 1, 0\)/g,
         'collision_rectangle(x, y, bbox_left - 3, y, $1, 1, 0)');
+      out = out.replace(/collision_rectangle\(x, y, bbox_right \+ 3, y, Solid_Mask, 1, 0\) && !collision_rectangle\(x, y, bbox_right \+ 3, y, Break_Mask, 1, 0\)/g,
+        'collision_rectangle(x, y, bbox_right + 3, y, Solid_Mask, 1, 0) && !collision_rectangle(x, y, bbox_right + 3, y, Break_Mask, 1, 0) && !collision_rectangle(x, y, bbox_right + 3, y, Solid_Line, 1, 0)');
+      out = out.replace(/collision_rectangle\(x, y, bbox_left - 3, y, Solid_Mask, 1, 0\) && !collision_rectangle\(x, y, bbox_left - 3, y, Break_Mask, 1, 0\)/g,
+        'collision_rectangle(x, y, bbox_left - 3, y, Solid_Mask, 1, 0) && !collision_rectangle(x, y, bbox_left - 3, y, Break_Mask, 1, 0) && !collision_rectangle(x, y, bbox_left - 3, y, Solid_Line, 1, 0)');
+      out = out.replace(/!place_meeting\(x \+ 35, bbox_bottom \+ 10, Solid_Mask\) && !place_meeting\(x \+ 35, bbox_bottom \+ 10, Break_Mask\)/g,
+        '!place_meeting(x + 35, bbox_bottom + 10, Solid_Mask) && !place_meeting(x + 35, bbox_bottom + 10, Break_Mask) && !place_meeting(x + 35, bbox_bottom + 10, Solid_Line)');
+      out = out.replace(/!place_meeting\(x - 35, bbox_bottom \+ 10, Solid_Mask\) && !place_meeting\(x - 35, bbox_bottom \+ 10, Break_Mask\)/g,
+        '!place_meeting(x - 35, bbox_bottom + 10, Solid_Mask) && !place_meeting(x - 35, bbox_bottom + 10, Break_Mask) && !place_meeting(x - 35, bbox_bottom + 10, Solid_Line)');
       MM.scripts['KnucklesAction'] = out;
     }
   }
