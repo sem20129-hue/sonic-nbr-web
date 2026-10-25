@@ -1698,7 +1698,18 @@
       if (typeof sw === 'string' && sw.indexOf('// wide fixed') < 0) {
         b[key] = sw.replace(/view_xview\[0\]/g, '(view_xview[0] + ' + off + ')') + '\n// wide fixed';
       }
-      // Metal Sonic pursuit: laser warning columns were at +40/+120/+200/+280,
+      // Metal Sonic / Exetior entrance: the spawn was x +-200, which was just
+      // off-screen in a 320-wide view but inside the 463-wide one (pop-in).
+      var cam = b['gml_Object_EggB2_Cam0_Step_0'];
+      if (typeof cam === 'string' && cam.indexOf('// wide spawn') < 0) {
+        cam = cam.replace('instance_create(x - 200, y, EggB2_MSonic)',
+                          'instance_create(x - (view_wview[0] / 2 + 40), y, EggB2_MSonic)');
+        cam = cam.replace('instance_create(x + 200, y + 14, EggB2_ExetiorBot)',
+                          'instance_create(x + (view_wview[0] / 2 + 40), y + 14, EggB2_ExetiorBot)');
+        cam = cam.replace('instance_create(x + 200, y, EggB2_ExetiorAct)',
+                          'instance_create(x + (view_wview[0] / 2 + 40), y, EggB2_ExetiorAct)');
+        b['gml_Object_EggB2_Cam0_Step_0'] = cam + '\n// wide spawn';
+      }
       // i.e. only across the old 320-wide view.  Spread them over the 463-wide
       // view so the right half also gets warnings.
       var rf = b['gml_Object_RF_MetalPursuit_Step_0'];
