@@ -1407,10 +1407,17 @@
   function collectPreloadJobs() {
     var jobs = [], seen = Object.create(null), n, d, i, f;
 
-    // 1. Sprite frames are NOT fetched up front anymore.  Keeping 2600+ decoded
-    // Images cost ~300 MB and prefetching every file stalled the loader; frames
-    // now load on first use (masks below still decide precise collisions).
-    // for (n in MM.sprites) { ... }
+    // 1. every sprite frame (full preload, as requested)
+    for (n in MM.sprites) {
+      d = MM.sprites[n];
+      if (!d || d.kind !== 'image' || !d.frames) continue;
+      for (i = 0; i < d.frames.length; i++) {
+        f = d.frames[i];
+        if (!f || f.img || !f.src || seen['f' + f.src]) continue;
+        seen['f' + f.src] = 1;
+        jobs.push({ kind: 'img', src: f.src, obj: f });
+      }
+    }
 
     // 2. every pixel mask (heroes and anything with maskKind "mask")
     for (n in MM.sprites) {
