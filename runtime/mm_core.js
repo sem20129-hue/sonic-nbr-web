@@ -942,8 +942,14 @@
   MM.setAspect = function (mode) {
     MM.aspect = (mode === '4:3') ? '4:3' : '16:9';
     if (MM.state.room) {
+      // applyRoomView() re-reads the room defaults, which would snap the camera
+      // back to the room start.  Keep the current camera position.
+      var xv = MM.view.xview.slice(0, 8), yv = MM.view.yview.slice(0, 8);
       MM.applyRoomView(MM.state.room);
-      MM.view.xview[0] = MM.view.xview[0] || 0;
+      for (var i = 0; i < 8; i++) {
+        MM.view.xview[i] = xv[i] || 0;
+        MM.view.yview[i] = yv[i] || 0;
+      }
     }
     return MM.aspect;
   };
@@ -1818,6 +1824,14 @@
 
     ctx.save();
     ctx.imageSmoothingEnabled = false;
+    // In 4:3 mode the world is only shown inside the 640x480 port: without this
+    // clip the level tiles/sprites from outside the 320-wide view bled into the
+    // side bars, which looked like broken backgrounds.
+    if (view.px > 0 || view.pw < W || view.py > 0 || view.ph < H) {
+      ctx.beginPath();
+      ctx.rect(view.px, view.py, view.pw, view.ph);
+      ctx.clip();
+    }
     ctx.setTransform(view.sx, 0, 0, view.sy,
       Math.round(view.px - (vx - ex) * view.sx) + sx,
       Math.round(view.py - vy * view.sy) + sy);
