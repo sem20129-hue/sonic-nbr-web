@@ -166,6 +166,42 @@
     }
   }
 
+  // A background image that is drawn wider than the art itself repeats, and the
+  // 320-wide menu backdrops do not wrap exactly -> a visible vertical line at
+  // every junction.  Build one seamless copy per image: the right edge is
+  // cross-faded into the left one, so the repeat has no hard boundary.
+  var seamlessCache = Object.create(null);
+  function seamlessBg(img, key) {
+    if (!img || !img.width || !hasCanvas) return img;
+    key = key || img.src || '';
+    var hit = seamlessCache[key];
+    if (hit) return hit;
+    var W = img.width, H = img.height;
+    var B = Math.min(96, Math.max(16, Math.round(W / 6)));
+    var cv = document.createElement('canvas');
+    cv.width = W; cv.height = H;
+    var g = cv.getContext('2d');
+    g.drawImage(img, 0, 0);
+    var st = document.createElement('canvas');
+    st.width = B; st.height = H;
+    var sg = st.getContext('2d');
+    sg.drawImage(img, 0, 0, B, H, 0, 0, B, H);
+    sg.globalCompositeOperation = 'destination-in';
+    var grad = sg.createLinearGradient(0, 0, B, 0);
+    grad.addColorStop(0, 'rgba(0,0,0,0)');
+    grad.addColorStop(1, 'rgba(0,0,0,1)');
+    sg.fillStyle = grad;
+    sg.fillRect(0, 0, B, H);
+    g.drawImage(st, W - B, 0);
+    seamlessCache[key] = cv;
+    return cv;
+  }
+  function bgSeamlessFor(img, url, drawn) {
+    if (drawn !== img) return drawn;            // tinted/derived copy: use as is
+    var key = (url && typeof url === 'string') ? url : (img.src || '');
+    return seamlessBg(img, key);
+  }
+
   MM.gfx.drawBackgrounds = function (ctx, room, vx, vy, foreground) {
     var S = MM.bg;
     if (!S || S.room !== room) { bgInit(room); S = MM.bg; }
@@ -199,18 +235,17 @@
         var spanW2 = Math.max(1, Math.round(act.w));
         var spanH2 = Math.max(1, Math.round(act.h));
         var left2 = vx - ex;
-        var period = spanW2 * 2;
-        var base2 = baseX;                       // keeps background_hspeed motion
-        var pan = base2 - Math.floor(base2 / period) * period;   // 0 .. period
+        // The 320-wide menu art is tiled over the wider view; use the seamless
+        // copy so the junction never reads as a vertical line, and keep the
+        // original background_hspeed motion.
+        var tile2 = bgSeamlessFor(img, S.img[i], drawn);
+        var base2 = baseX;
+        var pan = base2 - Math.floor(base2 / spanW2) * spanW2;   // 0 .. spanW2
         var first = Math.floor(pan / spanW2) - 1;
         for (var n = first; n <= first + 3; n++) {
           var cx = left2 - pan + n * spanW2;
           if (cx > left2 + spanW2 || cx + spanW2 < left2) continue;
-          ctx.save();
-          ctx.translate(Math.round(cx), Math.round(vy));
-          if (((n % 2) + 2) % 2 === 1) { ctx.translate(spanW2, 0); ctx.scale(-1, 1); }
-          ctx.drawImage(drawn, 0, 0, spanW2, spanH2);
-          ctx.restore();
+          ctx.drawImage(tile2, Math.round(cx), Math.round(vy), spanW2, spanH2);
         }
         ctx.globalAlpha = prevA;
         continue;
