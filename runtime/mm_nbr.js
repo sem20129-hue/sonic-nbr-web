@@ -1107,10 +1107,30 @@
   };
 
   B.window_set_fullscreen = function (ctx, args) {
+    var on = num(args[0], 0) !== 0;
     try {
-      if (num(args[0], 0) !== 0 && MM.canvas && MM.canvas.requestFullscreen) MM.canvas.requestFullscreen();
-      else if (document.exitFullscreen) document.exitFullscreen();
-    } catch (e) { /* ignore */ }
+      if (on) {
+        // Apply the CSS full-window layout right away; the promise below
+        // removes it only if the browser really entered fullscreen.
+        if (MM.onFullscreenFallback) MM.onFullscreenFallback(true);
+        var el = (MM.canvas && MM.canvas.parentElement) || MM.canvas;
+        var rq = el && (el.requestFullscreen || el.webkitRequestFullscreen);
+        if (rq) {
+          var p = rq.call(el);
+          if (p && p.then) p.then(function () {
+            if ((document.fullscreenElement || document.webkitFullscreenElement) && MM.onFullscreenFallback) {
+              MM.onFullscreenFallback(false);
+            }
+          }, function () {});
+        }
+      } else {
+        var q = document.exitFullscreen || document.webkitExitFullscreen;
+        if (q) q.call(document);
+        if (MM.onFullscreenFallback) MM.onFullscreenFallback(false);
+      }
+    } catch (e) {
+      if (MM.onFullscreenFallback) MM.onFullscreenFallback(on);
+    }
     return 0;
   };
 
