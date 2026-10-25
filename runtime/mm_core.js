@@ -1961,8 +1961,10 @@
         window.addEventListener('blur', syncClock);
         window.addEventListener('focus', wake);
       }
-      var loop = function (t) {
+      var lastLoop = 0;
+      var drive = function (t) {
         if (!MM.state.running) return;
+        lastLoop = t;
         var dt = t - last; last = t;
         if (!(dt > 0) || dt > 250) dt = stepMs;
         acc += dt;
@@ -1972,9 +1974,25 @@
           acc -= stepMs;
         }
         MM.renderFrame();
+      };
+      var loop = function (t) {
+        try { drive(t); } catch (e) { if (!MM._loopErr) MM._loopErr = String(e && e.message); }
         requestAnimationFrame(loop);
       };
       requestAnimationFrame(loop);
+      // Watchdog: some embedded browsers/webviews throttle or stop rAF even
+      // while the page is visible; without it the game looked frozen after the
+      // loading screen disappeared.  Drive the same loop from a timer whenever
+      // rAF has been silent for 200 ms.
+      if (typeof setInterval === 'function') {
+        setInterval(function () {
+          if (!MM.state.running) return;
+          if (typeof document !== 'undefined' && document.hidden) return;
+          var now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+          if (now - lastLoop <= 200) return;
+          try { drive(now); } catch (e) { if (!MM._loopErr) MM._loopErr = String(e && e.message); }
+        }, 50);
+      }
     }
     return MM;
   };
