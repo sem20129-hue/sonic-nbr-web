@@ -1740,6 +1740,21 @@
     }
   }
 
+  // Gliding turn: the decompiled script only flips image_xscale after
+  // global.vel crosses zero, so pressing the opposite direction first brakes
+  // for ~0.5 s and looks like a step backwards.  Face the pressed direction
+  // immediately; the glide acceleration then curves the actual velocity.
+  function patchGlideTurn() {
+    var s = MM.scripts && MM.scripts['KnucklesAction'];
+    if (typeof s !== 'string') return;
+    if (s.indexOf('// glide turn fixed') >= 0) return;
+    var key = 'if ((Glide == 1) && keyboard_check(ord("Z")))\n{';
+    if (s.indexOf(key) < 0) return;
+    s = s.replace(key, key +
+      '\n    // glide turn fixed\n    if (keyboard_check(vk_left)) image_xscale = -1;\n    if (keyboard_check(vk_right)) image_xscale = 1;');
+    MM.scripts['KnucklesAction'] = s;
+  }
+
   function patchKeyboardEvents() {
     var objs = MM.objects || {};
     for (var name in objs) {
@@ -1827,6 +1842,7 @@
     patchSegaCheat();
     patchKeyboardEvents();
     patchKnucklesClimb();
+    patchGlideTurn();
     patchWideUI();
     opts = opts || {};
     MM.VIEW_W = opts.width || 640;
