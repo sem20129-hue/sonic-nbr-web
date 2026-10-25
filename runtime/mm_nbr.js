@@ -270,21 +270,45 @@
         // opaque horizontal runs per row -- lets mask-vs-rectangle tests skip
         // the per-pixel loop entirely
         var rows = new Array(cv.height);
+        var solidPixels = 0;
         for (var ry = 0; ry < cv.height; ry++) {
           var runs = [];
           var rx = 0;
           while (rx < cv.width) {
-            if (d[(ry * cv.width + rx) * 4 + 3] > 16) {
+            // Mask PNGs are silhouettes on a white background: white pixels are
+            // solid, black are holes.  Alpha is opaque everywhere, so luminance
+            // (not alpha) defines the collision shape.  This is what makes
+            // one-way bridges ("unsolid" masks) and slopes work like GM.
+            var i0 = (ry * cv.width + rx) * 4;
+            var solid = d[i0 + 3] > 16 && (d[i0] * 0.299 + d[i0 + 1] * 0.587 + d[i0 + 2] * 0.114) >= 128;
+            if (solid) {
               var s0 = rx;
-              while (rx < cv.width && d[(ry * cv.width + rx) * 4 + 3] > 16) rx++;
+              while (rx < cv.width) {
+                var i1 = (ry * cv.width + rx) * 4;
+                var s1 = d[i1 + 3] > 16 && (d[i1] * 0.299 + d[i1 + 1] * 0.587 + d[i1 + 2] * 0.114) >= 128;
+                if (!s1) break;
+                rx++;
+              }
               runs.push([s0, rx - 1]);
+              solidPixels += rx - s0;
             } else {
               rx++;
             }
           }
           rows[ry] = runs;
         }
-        maskCache[src] = { w: cv.width, h: cv.height, data: d, rows: rows };
+        var cover = solidPixels / (cv.width * cv.height);
+        maskCache[src] = {
+          w: cv.width, h: cv.height, data: d, rows: rows,
+          cover: cover,
+          // Only genuinely shaped masks are used for precise tests.  Regular
+          // terrain renders as "all solid except a one pixel border", which
+          // must keep behaving exactly like its bbox.
+          precise: cover < 0.80,
+          // Nearly empty silhouettes are one-way helpers (bridge pass-through);
+          // the engine's snap helpers must ignore them.
+          sparse: cover < 0.35
+        };
       } catch (e) { /* tainted canvas etc. */ }
       maskLoading[src] = false;
       flushMask(src);
@@ -295,6 +319,29 @@
   }
 
   MM.preloadMask = function (src) { if (src) maskData(src); };
+
+  // Precise-mask variant used by collision_rectangle(prec = 1): does the
+  // instance's silhouette touch this world rectangle?
+  MM.maskOverlapsBox = function (inst, rect) {
+    var spr = inst.mask_index || inst.sprite_index;
+    var m = maskHit(spr);
+    if (!m || !m.precise) return true; // bbox already overlapped
+    return maskHitsBox(inst, spr, m, rect);
+  };
+
+  // One-way / irregular objects (bridges while passable, slopes) must not be
+  // treated as generic solid geometry by the engine's snap helpers.
+  MM.maskPreciseFor = function (inst) {
+    var spr = inst.mask_index || inst.sprite_index;
+    var m = maskHit(spr);
+    return !!(m && m.precise);
+  };
+
+  MM.maskSparseFor = function (inst) {
+    var spr = inst.mask_index || inst.sprite_index;
+    var m = maskHit(spr);
+    return !!(m && m.sparse);
+  };
 
   function maskHit(spr) {
     if (!spr || spr.kind !== 'image' || !spr.mask) return null;
@@ -312,8 +359,9 @@
     var lx = Math.floor((px - inst.x) / (sx || 1) + ox);
     var ly = Math.floor((py - inst.y) / (sy || 1) + oy);
     if (lx < 0 || ly < 0 || lx >= m.w || ly >= m.h) return false;
-    var a = m.data[(ly * m.w + lx) * 4 + 3];
-    return a > 16;
+    var i = (ly * m.w + lx) * 4;
+    if (m.data[i + 3] <= 16) return false;
+    return (m.data[i] * 0.299 + m.data[i + 1] * 0.587 + m.data[i + 2] * 0.114) >= 128;
   }
 
 
@@ -347,8 +395,11 @@
   MM.collides = function (a, b, boxA, boxB) {
     if (!(boxA.l <= boxB.r && boxA.r >= boxB.l && boxA.t <= boxB.b && boxA.b >= boxB.t)) return false;
     var sprA = a.mask_index || a.sprite_index, sprB = b.mask_index || b.sprite_index;
-    var mA = (a.object_index && a.object_index.maskKind === 'mask') ? maskHit(sprA) : null;
-    var mB = (b.object_index && b.object_index.maskKind === 'mask') ? maskHit(sprB) : null;
+    var mA = null, mB = null;
+    var ma = maskHit(sprA);
+    if (ma && ma.precise) mA = ma;
+    var mb = maskHit(sprB);
+    if (mb && mb.precise) mB = mb;
     if (!mA && !mB) return true;
     if (mA && !mB) return maskHitsBox(a, sprA, mA, boxB);
     if (mB && !mA) return maskHitsBox(b, sprB, mB, boxA);

@@ -227,7 +227,7 @@
     return B.instance_position(c, a) !== MM.NOONE ? 1 : 0;
   };
   B.collision_rectangle = function (c, a) {
-    var r = MM.collisionRectangle(num(a[0]), num(a[1]), num(a[2]), num(a[3]), a[4], num(a[6]) !== 0);
+    var r = MM.collisionRectangle(num(a[0]), num(a[1]), num(a[2]), num(a[3]), a[4], num(a[6]) !== 0, num(a[5]) !== 0);
     return r === MM.NOONE ? 0 : 1;
   };
   B.distance_to_object = function (c, a) {

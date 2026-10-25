@@ -666,9 +666,9 @@
     if (!selfBox) return false;
     var list = MM.query(objValue);
     var def = typeof objValue === 'string' ? MM.objects[objValue] : objValue;
-    return eachOverlapping(def, list, selfBox, function (o) {
+    return eachOverlapping(def, list, selfBox, function (o, ob) {
       if (notme !== false && o === who) return false;
-      return true;
+      return MM.collides ? MM.collides(who, o, selfBox, ob) : boxesOverlap(selfBox, ob);
     });
   };
 
@@ -679,10 +679,13 @@
     var list = MM.query(objValue);
     var def = typeof objValue === 'string' ? MM.objects[objValue] : objValue;
     var found = MM.NOONE;
-    eachOverlapping(def, list, selfBox, function (o) {
+    eachOverlapping(def, list, selfBox, function (o, ob) {
       if (o === who) return false;
-      found = o;
-      return true;
+      if (MM.collides ? MM.collides(who, o, selfBox, ob) : boxesOverlap(selfBox, ob)) {
+        found = o;
+        return true;
+      }
+      return false;
     });
     return found;
   };
@@ -719,9 +722,10 @@
     return rec;
   }
 
-  MM.collisionRectangle = function (x1, y1, x2, y2, objValue, notme) {
+  MM.collisionRectangle = function (x1, y1, x2, y2, objValue, notme, prec) {
     var l = Math.min(x1, x2), r = Math.max(x1, x2);
     var t = Math.min(y1, y2), b = Math.max(y1, y2);
+    var rect = { l: l, r: r, t: t, b: b };
     var def = typeof objValue === 'string' ? MM.objects[objValue] : objValue;
     var list = MM.query(def || objValue);
     var self = MM.state.currentSelf;
@@ -730,7 +734,9 @@
         var o = list[i];
         if (notme && o === self) continue;
         var ob = MM.bbox(o);
-        if (ob && ob.l <= r && ob.r >= l && ob.t <= b && ob.b >= t) return o;
+        if (ob && ob.l <= r && ob.r >= l && ob.t <= b && ob.b >= t) {
+          if (!prec || !MM.maskOverlapsBox || MM.maskOverlapsBox(o, rect)) return o;
+        }
       }
       return MM.NOONE;
     }
@@ -748,14 +754,16 @@
       var io = e.o;
       if (io._destroyed) continue;
       if (notme && io === self) continue;
-      return io;
+      if (!prec || !MM.maskOverlapsBox || MM.maskOverlapsBox(io, rect)) return io;
     }
     for (var k = 0; k < rec.dyn.length; k++) {
       var d = rec.dyn[k];
       if (d._destroyed) continue;
       if (notme && d === self) continue;
       var db = MM.bbox(d);
-      if (db && db.l <= r && db.r >= l && db.t <= b && db.b >= t) return d;
+      if (db && db.l <= r && db.r >= l && db.t <= b && db.b >= t) {
+        if (!prec || !MM.maskOverlapsBox || MM.maskOverlapsBox(d, rect)) return d;
+      }
     }
     return MM.NOONE;
   };
@@ -865,7 +873,11 @@
     for (var i = 0; i < st.instances.length; i++) {
       var o = st.instances[i];
       if (o._destroyed || o._deactivated) continue;
-      if (isLevelSolid(o.object_index)) list.push(o);
+      if (!isLevelSolid(o.object_index)) continue;
+      // One-way bridges / slopes carry a precise silhouette; their own game
+      // logic decides passage, the generic snap must leave them alone.
+      if (MM.maskSparseFor && MM.maskSparseFor(o)) continue;
+      list.push(o);
     }
     st._levelSolids = list;
     st._levelSolidsVersion = st.version;
