@@ -1609,10 +1609,27 @@
       if (src.indexOf('// climb fixed') >= 0) continue;
       var needle = 'if (place_meeting(x, bbox_bottom + 1, ' + mask + ') && (vspeed >= 0))';
       if (src.indexOf(needle) < 0) continue;
-      var side = '(place_meeting(bbox_right + 1, y, ' + mask + ') || place_meeting(bbox_left - 1, y, ' + mask + '))';
+      var side = '(place_meeting(bbox_right + 3, y, ' + mask + ') || place_meeting(bbox_left - 3, y, ' + mask + '))';
       var repl = 'if (place_meeting(x, bbox_bottom + 1, ' + mask + ') && (vspeed >= 0) && ' +
                  '(((Glide == 0) && (Climb == 0) && (Climb2 == 0)) || !' + side + ')) // climb fixed';
-      b[key] = src.replace(needle, repl);
+      src = src.replace(needle, repl);
+      // Wall grab and climb movement: tile seams can leave a 1-2 px gap, so the
+      // original +-1 probe missed the next tile and the climb dropped.
+      src = src.replace(new RegExp('place_meeting\\(bbox_right \\+ 1, y, ' + mask + '\\)', 'g'), 'place_meeting(bbox_right + 3, y, ' + mask + ')');
+      src = src.replace(new RegExp('place_meeting\\(bbox_left - 1, y, ' + mask + '\\)', 'g'), 'place_meeting(bbox_left - 3, y, ' + mask + ')');
+      src = src.replace(new RegExp('collision_rectangle\\(x, y, bbox_right \\+ 1, y, ' + mask + ', 1, 0\\)', 'g'), 'collision_rectangle(x, y, bbox_right + 3, y, ' + mask + ', 1, 0)');
+      src = src.replace(new RegExp('collision_rectangle\\(x, y, bbox_left - 1, y, ' + mask + ', 1, 0\\)', 'g'), 'collision_rectangle(x, y, bbox_left - 3, y, ' + mask + ', 1, 0)');
+      b[key] = src;
+    }
+    // The climb movement itself lives in the KnucklesAction script.
+    var act = MM.scripts && MM.scripts['KnucklesAction'];
+    if (typeof act === 'string') {
+      var out = act;
+      out = out.replace(/collision_rectangle\(x, y, bbox_right \+ 1, y, (Solid_Mask|Break_Mask), 1, 0\)/g,
+        'collision_rectangle(x, y, bbox_right + 3, y, $1, 1, 0)');
+      out = out.replace(/collision_rectangle\(x, y, bbox_left - 1, y, (Solid_Mask|Break_Mask), 1, 0\)/g,
+        'collision_rectangle(x, y, bbox_left - 3, y, $1, 1, 0)');
+      MM.scripts['KnucklesAction'] = out;
     }
   }
 
