@@ -24,11 +24,19 @@
   #stage {
     position: relative;
     display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
     image-rendering: pixelated;
     image-rendering: crisp-edges;
     background: #000;
     box-shadow: 0 0 0 1px #2a2a38, 0 18px 60px rgba(0,0,0,.85);
   }
+  #ambient {
+    position: absolute; inset: -6%; width: 112%; height: 112%;
+    filter: blur(18px) brightness(.42) saturate(.8);
+    transform: translateZ(0);
+    z-index: 0; pointer-events: none;
+  }
+  #game { position: relative; z-index: 1; }
   canvas { display: block; image-rendering: pixelated; image-rendering: crisp-edges; }
   #overlay {
     position: absolute; inset: 0;
@@ -95,7 +103,8 @@
 <body>
 <div id="wrap">
   <div id="stage">
-    <canvas id="game" width="854" height="480"></canvas>
+    <canvas id="ambient" width="427" height="240"></canvas>
+    <canvas id="game" width="640" height="480"></canvas>
     <div id="hud"></div>
     <div id="overlay">
       <div class="card">
@@ -143,24 +152,24 @@
 </script>
 
 <!-- runtime -->
-<script src="runtime/mm_core.js?v=202610251159"></script>
-<script src="runtime/mm_interp.js?v=202610251159"></script>
-<script src="runtime/mm_builtins.js?v=202610251159"></script>
-<script src="runtime/mm_audio.js?v=202610251159"></script>
-<script src="runtime/mm_nbr.js?v=202610251159"></script>
-<script src="runtime/mm_fanending.js?v=202610251159"></script>
+<script src="runtime/mm_core.js?v=202610251204"></script>
+<script src="runtime/mm_interp.js?v=202610251204"></script>
+<script src="runtime/mm_builtins.js?v=202610251204"></script>
+<script src="runtime/mm_audio.js?v=202610251204"></script>
+<script src="runtime/mm_nbr.js?v=202610251204"></script>
+<script src="runtime/mm_fanending.js?v=202610251204"></script>
 
 <!-- generated game package -->
-<script src="game/code.js?v=202610251159"></script>
-<script src="game/sprites.js?v=202610251159"></script>
-<script src="game/objects.js?v=202610251159"></script>
-<script src="game/asset_ids.js?v=202610251159"></script>
-<script src="game/rooms.js?v=202610251159"></script>
-<script src="game/scripts.js?v=202610251159"></script>
-<script src="game/sounds.js?v=202610251159"></script>
-<script src="game/fonts.js?v=202610251159"></script>
-<script src="game/assets.js?v=202610251159"></script>
-<script src="game/tiles.js?v=202610251159"></script>
+<script src="game/code.js?v=202610251204"></script>
+<script src="game/sprites.js?v=202610251204"></script>
+<script src="game/objects.js?v=202610251204"></script>
+<script src="game/asset_ids.js?v=202610251204"></script>
+<script src="game/rooms.js?v=202610251204"></script>
+<script src="game/scripts.js?v=202610251204"></script>
+<script src="game/sounds.js?v=202610251204"></script>
+<script src="game/fonts.js?v=202610251204"></script>
+<script src="game/assets.js?v=202610251204"></script>
+<script src="game/tiles.js?v=202610251204"></script>
 
 <script>
 (function () {
@@ -183,26 +192,17 @@
     var availH = full ? window.innerHeight : window.innerHeight - barH - 68;
     if (availW < 80) availW = 80;
     if (availH < 60) availH = 60;
-    var baseW = canvas.width || 854, baseH = canvas.height || 480;
+    var baseW = canvas.width || 640, baseH = canvas.height || 480;
     var raw = Math.min(availW / baseW, availH / baseH);
-    // Fill the window/screen in both modes.  Integer scaling (the old
-    // windowed behaviour) left a 640x480 island on any normal display.
     var scale = raw;
     var w = Math.max(1, Math.floor(baseW * scale));
     var h = Math.max(1, Math.floor(baseH * scale));
     canvas.style.width = w + 'px';
     canvas.style.height = h + 'px';
-    // Native fullscreen makes #stage a fixed element pinned to 0,0.  A fixed
-    // size there left the game glued to the top-left corner with a black band
-    // on the right; give the stage the whole screen and let flex centre the
-    // 4:3 canvas.
-    if (realFs()) {
-      stage.style.width = '100vw';
-      stage.style.height = '100vh';
-    } else {
-      stage.style.width = w + 'px';
-      stage.style.height = h + 'px';
-    }
+    // The stage fills the whole area and the blurred copy of the frame fills
+    // the sides; the game itself keeps its original 4:3 pixels.
+    stage.style.width = availW + 'px';
+    stage.style.height = availH + 'px';
   }
   window.addEventListener('resize', fit);
   fit();
@@ -237,7 +237,20 @@
     document.body.classList.toggle('fakefs', on);
     fit();
   }
-  document.getElementById('fs').addEventListener('click', toggleFs);
+  document.getElementById('fs').addEventListener('click', function () {
+    toggleFs();
+    // Keep keyboard focus off the button: otherwise Enter (dialog advance in
+    // the game) activates it and toggles fullscreen instead of progressing.
+    if (this.blur) this.blur();
+  });
+  window.addEventListener('keydown', function (e) {
+    var tag = e.target && e.target.tagName;
+    if ((tag === 'BUTTON' || tag === 'A') && (e.keyCode === 13 || e.keyCode === 32)) {
+      // The game still receives the key through the window listener; only the
+      // browser's default "activate the focused control" is suppressed.
+      e.preventDefault();
+    }
+  }, true);
   stage.addEventListener('dblclick', toggleFs);
   window.addEventListener('keydown', function (e) {
     if (e.keyCode === 70 && !e.ctrlKey && !e.altKey && !e.metaKey) toggleFs(); // F
@@ -258,11 +271,30 @@
                     ' · звуков: ' + (summary.sounds || 0) +
                     ' · скриптов: ' + (summary.scripts || 0);
 
-  MM.nbrBoot({ canvas: canvas, room: 'LanguageSelect_19', width: 854, height: 480, fps: 60 });
+  MM.nbrBoot({ canvas: canvas, room: 'LanguageSelect_19', width: 640, height: 480, fps: 60 });
   // The decompiled game toggles fullscreen with its own `S` key
   // (window_set_fullscreen).  Some browsers reject that API; route the failure
   // to the CSS full-window layout so the result is the same either way.
   MM.onFullscreenFallback = function (on) { fakeFs(!!on); };
+
+  // --- ambient backdrop -------------------------------------------------
+  // The game keeps its original 4:3 pixels; a blurred, darkened copy of the
+  // current frame fills the rest of the 16:9 stage.  No stretching, no seams,
+  // no broken dialogs.
+  var ambient = document.getElementById('ambient');
+  var actx = ambient.getContext('2d');
+  function drawAmbient() {
+    var aw = ambient.width, ah = ambient.height;
+    var s = Math.max(aw / canvas.width, ah / canvas.height);
+    var w = canvas.width * s, h = canvas.height * s;
+    actx.clearRect(0, 0, aw, ah);
+    actx.drawImage(canvas, (aw - w) / 2, (ah - h) / 2, w, h);
+  }
+  var baseRender = MM.renderFrame;
+  MM.renderFrame = function () {
+    baseRender.apply(MM, arguments);
+    try { drawAmbient(); } catch (e) { /* ignore */ }
+  };
 
   // --- full preload ----------------------------------------------------
   // Every sprite frame, mask, background and the bytes of every sound is

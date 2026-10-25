@@ -92,24 +92,18 @@
       ph *= fit;
     }
     var sx = pw / vw, sy = ph / vh;
-    // Rooms whose camera follows a hero get a real widescreen view: keep the
-    // original pixel scale (no stretching) and reveal extra world on both
-    // sides.  Static art screens (logos, menus, title) keep the exact 4:3
-    // composition centred with clean side bars -- expanding those only showed
-    // seams where the artwork ends.
-    var follow = !!MM.view.object[idx];
-    var extra = follow ? (MM.VIEW_W - pw) / (2 * sx) : 0;
-    var px = follow ? 0 : Math.max(0, Math.round((MM.VIEW_W - pw) / 2));
+    // The page draws a blurred copy of the frame into the 16:9 sides; the game
+    // itself keeps the exact 4:3 composition of the original.
     return {
       index: idx,
       x: MM.view.xview[idx] || 0,
       y: MM.view.yview[idx] || 0,
       w: vw, h: vh,
-      px: px, py: 0,
+      px: MM.view.portX[idx] || 0, py: MM.view.portY[idx] || 0,
       pw: pw, ph: ph,
       sx: sx,
       sy: sy,
-      extra: extra > 0 ? extra : 0
+      extra: 0
     };
   };
 
