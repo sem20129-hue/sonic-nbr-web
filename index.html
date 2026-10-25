@@ -32,6 +32,7 @@
   }
   #game { position: relative; z-index: 1; }
   canvas { display: block; image-rendering: pixelated; image-rendering: crisp-edges; }
+  canvas:focus { outline: none; }
   #overlay {
     position: absolute; inset: 0;
     display: flex; align-items: center; justify-content: center;
@@ -104,7 +105,7 @@
 <body>
 <div id="wrap">
   <div id="stage">
-    <canvas id="game" width="854" height="480"></canvas>
+    <canvas id="game" width="854" height="480" tabindex="0"></canvas>
     <div id="hud"></div>
     <div id="overlay">
       <div class="card">
@@ -153,24 +154,24 @@
 </script>
 
 <!-- runtime -->
-<script src="runtime/mm_core.js?v=20261025145112"></script>
-<script src="runtime/mm_interp.js?v=20261025145112"></script>
-<script src="runtime/mm_builtins.js?v=20261025145112"></script>
-<script src="runtime/mm_audio.js?v=20261025145112"></script>
-<script src="runtime/mm_nbr.js?v=20261025145112"></script>
-<script src="runtime/mm_fanending.js?v=20261025145112"></script>
+<script src="runtime/mm_core.js?v=20261025151705"></script>
+<script src="runtime/mm_interp.js?v=20261025151705"></script>
+<script src="runtime/mm_builtins.js?v=20261025151705"></script>
+<script src="runtime/mm_audio.js?v=20261025151705"></script>
+<script src="runtime/mm_nbr.js?v=20261025151705"></script>
+<script src="runtime/mm_fanending.js?v=20261025151705"></script>
 
 <!-- generated game package -->
-<script src="game/code.js?v=20261025145112"></script>
-<script src="game/sprites.js?v=20261025145112"></script>
-<script src="game/objects.js?v=20261025145112"></script>
-<script src="game/asset_ids.js?v=20261025145112"></script>
-<script src="game/rooms.js?v=20261025145112"></script>
-<script src="game/scripts.js?v=20261025145112"></script>
-<script src="game/sounds.js?v=20261025145112"></script>
-<script src="game/fonts.js?v=20261025145112"></script>
-<script src="game/assets.js?v=20261025145112"></script>
-<script src="game/tiles.js?v=20261025145112"></script>
+<script src="game/code.js?v=20261025151705"></script>
+<script src="game/sprites.js?v=20261025151705"></script>
+<script src="game/objects.js?v=20261025151705"></script>
+<script src="game/asset_ids.js?v=20261025151705"></script>
+<script src="game/rooms.js?v=20261025151705"></script>
+<script src="game/scripts.js?v=20261025151705"></script>
+<script src="game/sounds.js?v=20261025151705"></script>
+<script src="game/fonts.js?v=20261025151705"></script>
+<script src="game/assets.js?v=20261025151705"></script>
+<script src="game/tiles.js?v=20261025151705"></script>
 
 <script>
 (function () {
@@ -400,7 +401,8 @@
     }
     if (hero) pos = ' · x' + Math.round(hero.x) + ' y' + Math.round(hero.y);
     var err = (MM._loopErr ? ' · ОШИБКА: ' + MM._loopErr : '');
-    hud.textContent = MM.state.room.name + ' · ' + MM.state.frame + pos + audio + ' · ' + (MM.aspect === '4:3' ? '4:3' : '16:9') + ' · сборка ' + BUILD + err;
+    var focusHint = (document.hasFocus ? (document.hasFocus() ? '' : ' · кликни по игре') : '');
+    hud.textContent = MM.state.room.name + ' · ' + MM.state.frame + pos + audio + ' · ' + (MM.aspect === '4:3' ? '4:3' : '16:9') + ' · сборка ' + BUILD + focusHint + err;
   }, 250);
 
   // --- audio unlock + start --------------------------------------------
@@ -413,6 +415,13 @@
     canvas.focus();
   }
   overlay.addEventListener('click', start);
+  // Clicking anywhere on the game also focuses it and un-pauses if a stale
+  // paused flag survived (embedded panes do not always deliver keydown until
+  // the game surface is focused).
+  stage.addEventListener('pointerdown', function () {
+    try { canvas.focus(); } catch (e) { /* ignore */ }
+    if (ready && MM.state && MM.state.paused) MM.state.paused = false;
+  });
   window.addEventListener('keydown', function (e) {
     if (!overlay.classList.contains('hidden')) start();
   }, { once: false });
