@@ -1583,6 +1583,30 @@
     ctx.drawImage(img, t.sx, t.sy, t.w, t.h, t.x, t.y, t.w * k, t.h * l);
   }
 
+  // Tile layers can be hidden/shown per depth (tile_layer_hide/show).  GHZ_7
+  // hides its checkerboard back layers at the start and shows them again for
+  // the corrupted "Bloody Hill" variant, so ignoring this call left the big
+  // checker walls visible over the sky in Tails' intro.
+  MM.tileLayerHidden = Object.create(null);
+  MM.resetTileLayers = function (room) {
+    var key = (room && room.name) || '';
+    MM.tileLayerHidden[key] = Object.create(null);
+  };
+  MM.setTileLayerVisible = function (depth, visible) {
+    var room = MM.state.room;
+    if (!room) return;
+    var key = room.name;
+    var set = MM.tileLayerHidden[key] || (MM.tileLayerHidden[key] = Object.create(null));
+    var d = Number(depth);
+    if (visible) delete set[d];
+    else set[d] = true;
+  };
+  MM.tileLayerHiddenAt = function (depth) {
+    var room = MM.state.room;
+    var set = room && MM.tileLayerHidden && MM.tileLayerHidden[room.name];
+    return !!(set && set[Number(depth)]);
+  };
+
   function drawTileLayers(ctx, room, vx, vy) {
     var tl = room.tileLayer;
     if (!tl) return;
@@ -1624,6 +1648,7 @@
     MM.state.pendingRoom = null;
     MM.state.frameInRoom = 0;
     MM.state.loadingRoom = true;
+    MM.resetTileLayers(room);
     MM.applyRoomView(room);
     MM.view.xview[0] = MM.view.xview[0] || 0;
     MM.view.yview[0] = MM.view.yview[0] || 0;
@@ -1846,6 +1871,7 @@
         var TQ = roomTiles[tq];
         var tw = TQ.w * (TQ.k == null ? 1 : TQ.k);
         var th = TQ.h * (TQ.l == null ? 1 : TQ.l);
+        if (MM.tileLayerHiddenAt(TQ.d)) continue;          // tile_layer_hide(depth)
         if (TQ.x + tw < vx - tmg || TQ.x > vx + vw + tmg ||
             TQ.y + th < vy - tmg || TQ.y > vy + vh + tmg) continue;
         tileDraw.push(TQ);

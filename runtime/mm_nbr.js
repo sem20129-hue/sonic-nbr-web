@@ -190,13 +190,28 @@
       var baseY = S.baseY[i] + S.y[i] - vy * num(S.speedY[i], 0) / 100;
       var prevA = ctx.globalAlpha;
       ctx.globalAlpha = Math.max(0, Math.min(1, prevA * alpha));
-      // Menu/art screens in 16:9: their 320-wide backdrop was tiled for a
-      // 320-wide view.  Repeating it across the wider view showed dark bands at
-      // every tile edge (the art has a soft border), so draw one copy stretched
-      // over the visible span instead.  Scrolling rooms are untouched.
+      // Menu/art screens in 16:9: their 320-wide backdrop was drawn for a
+      // 320-wide view, so repeating it across the wider view showed a hard dark
+      // band at every tile edge.  Draw it one copy wide (scaled to the visible
+      // span) and keep the original background scroll: copies alternate
+      // mirrored, so the junction is continuous instead of a visible seam.
       if (ex > 0 && MM.isStaticArtRoom && MM.isStaticArtRoom()) {
-        ctx.drawImage(drawn, Math.round(vx - ex), Math.round(vy),
-          Math.round(act.w), Math.round(act.h));
+        var spanW2 = Math.max(1, Math.round(act.w));
+        var spanH2 = Math.max(1, Math.round(act.h));
+        var left2 = vx - ex;
+        var period = spanW2 * 2;
+        var base2 = baseX;                       // keeps background_hspeed motion
+        var pan = base2 - Math.floor(base2 / period) * period;   // 0 .. period
+        var first = Math.floor(pan / spanW2) - 1;
+        for (var n = first; n <= first + 3; n++) {
+          var cx = left2 - pan + n * spanW2;
+          if (cx > left2 + spanW2 || cx + spanW2 < left2) continue;
+          ctx.save();
+          ctx.translate(Math.round(cx), Math.round(vy));
+          if (((n % 2) + 2) % 2 === 1) { ctx.translate(spanW2, 0); ctx.scale(-1, 1); }
+          ctx.drawImage(drawn, 0, 0, spanW2, spanH2);
+          ctx.restore();
+        }
         ctx.globalAlpha = prevA;
         continue;
       }
@@ -1065,8 +1080,14 @@
     return 0;
   };
 
-  B.tile_layer_show = function (ctx, args) { return 0; };
-  B.tile_layer_hide = function (ctx, args) { return 0; };
+  B.tile_layer_show = function (ctx, args) {
+    if (MM.setTileLayerVisible) MM.setTileLayerVisible(args[0], true);
+    return 0;
+  };
+  B.tile_layer_hide = function (ctx, args) {
+    if (MM.setTileLayerVisible) MM.setTileLayerVisible(args[0], false);
+    return 0;
+  };
 
   /* --- paths ------------------------------------------------------------ */
 
