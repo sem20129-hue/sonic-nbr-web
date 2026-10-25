@@ -95,6 +95,25 @@
     // Camera rooms get a real 16:9 view: widen the logical view to the screen
     // aspect instead of showing out-of-room strips.  Static art screens keep
     // the original 4:3 port, centred.
+    // Static screens (menus, data select): keep their 320-wide composition, but
+    // extend the visible world/background to the full 16:9 width instead of
+    // leaving black bars.  The menu itself stays centred.
+    if (MM.aspect !== '4:3' && !MM.view.object[idx]) {
+      var wideW = Math.max(vw, Math.round(vh * MM.VIEW_W / MM.VIEW_H));
+      var wex = (wideW - vw) / 2;
+      return {
+        index: idx,
+        x: MM.view.xview[idx] || 0,
+        y: MM.view.yview[idx] || 0,
+        w: wideW, h: vh,
+        px: 0, py: 0,
+        pw: MM.VIEW_W, ph: MM.VIEW_H,
+        sx: MM.VIEW_W / wideW,
+        sy: MM.VIEW_H / vh,
+        extra: wex > 0 ? wex : 0
+      };
+    }
+
     if (MM.aspect !== '4:3' && MM.view.object[idx]) {
       return {
         index: idx,
