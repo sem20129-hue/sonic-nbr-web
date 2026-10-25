@@ -758,7 +758,8 @@
     c.font = MM.gfx.font || '12px monospace';
     c.textAlign = 'left';
     c.fillStyle = MM.gfx.color;
-    c.fillText(s, x, y);
+    var fb = textLines(s);
+    for (var fi = 0; fi < fb.length; fi++) c.fillText(fb[fi], x, y + fi * 12);
     return 0;
   };
 
@@ -790,7 +791,10 @@
       gr3.addColorStop(0, gmsColorA(c1, alpha));
       gr3.addColorStop(1, gmsColorA(c3, alpha));
       c.fillStyle = gr3;
-      c.fillText(textLines(s).join(' '), x, y);
+      // Keep the '#' line breaks even in the fallback (no bitmap font), instead
+      // of gluing everything into one endless line.
+      var fbLines = textLines(s);
+      for (var li = 0; li < fbLines.length; li++) c.fillText(fbLines[li], x, y + li * 12);
     } catch (e) { /* ignore */ }
     return 0;
   };
