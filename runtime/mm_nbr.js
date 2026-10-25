@@ -1486,8 +1486,22 @@
     }
   }
 
+  // GHZ_Animal2 sets hspeed from image_xscale *before* the random facing is
+  // chosen, so every bird whose sprite ends up mirrored flies backwards.
+  function patchBirdFacing() {
+    var b = MM.codeBundle;
+    if (!b) return;
+    var key = 'gml_Object_GHZ_Animal2_Create_0';
+    var src = b[key];
+    if (typeof src !== 'string') return;
+    if (src.indexOf('hspeed = image_xscale * 3.5') < 0) return;
+    if (src.indexOf('// facing fixed') >= 0) return;
+    b[key] = src + '\n// facing fixed\nif (GOD_OBJECT.DeadAnimals == 0) { hspeed = image_xscale * 3.5; }';
+  }
+
   MM.nbrBoot = function (opts) {
     patchSpringContacts();
+    patchBirdFacing();
     opts = opts || {};
     MM.VIEW_W = opts.width || 640;
     MM.VIEW_H = opts.height || 480;
