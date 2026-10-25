@@ -153,24 +153,24 @@
 </script>
 
 <!-- runtime -->
-<script src="runtime/mm_core.js?v=202610251429"></script>
-<script src="runtime/mm_interp.js?v=202610251429"></script>
-<script src="runtime/mm_builtins.js?v=202610251429"></script>
-<script src="runtime/mm_audio.js?v=202610251429"></script>
-<script src="runtime/mm_nbr.js?v=202610251429"></script>
-<script src="runtime/mm_fanending.js?v=202610251429"></script>
+<script src="runtime/mm_core.js?v=20261025143046"></script>
+<script src="runtime/mm_interp.js?v=20261025143046"></script>
+<script src="runtime/mm_builtins.js?v=20261025143046"></script>
+<script src="runtime/mm_audio.js?v=20261025143046"></script>
+<script src="runtime/mm_nbr.js?v=20261025143046"></script>
+<script src="runtime/mm_fanending.js?v=20261025143046"></script>
 
 <!-- generated game package -->
-<script src="game/code.js?v=202610251429"></script>
-<script src="game/sprites.js?v=202610251429"></script>
-<script src="game/objects.js?v=202610251429"></script>
-<script src="game/asset_ids.js?v=202610251429"></script>
-<script src="game/rooms.js?v=202610251429"></script>
-<script src="game/scripts.js?v=202610251429"></script>
-<script src="game/sounds.js?v=202610251429"></script>
-<script src="game/fonts.js?v=202610251429"></script>
-<script src="game/assets.js?v=202610251429"></script>
-<script src="game/tiles.js?v=202610251429"></script>
+<script src="game/code.js?v=20261025143046"></script>
+<script src="game/sprites.js?v=20261025143046"></script>
+<script src="game/objects.js?v=20261025143046"></script>
+<script src="game/asset_ids.js?v=20261025143046"></script>
+<script src="game/rooms.js?v=20261025143046"></script>
+<script src="game/scripts.js?v=20261025143046"></script>
+<script src="game/sounds.js?v=20261025143046"></script>
+<script src="game/fonts.js?v=20261025143046"></script>
+<script src="game/assets.js?v=20261025143046"></script>
+<script src="game/tiles.js?v=20261025143046"></script>
 
 <script>
 (function () {
@@ -182,7 +182,7 @@
   var hud = document.getElementById('hud');
   var BUILD = (function () {
     var s = document.querySelector('script[src*="mm_core.js"]');
-    var m = s && /v=(\d{12})/.exec(s.src);
+    var m = s && /v=(\d{12,14})/.exec(s.src);
     return m ? m[1] : 'dev';
   })();
   window.addEventListener('error', function (e) {
@@ -348,7 +348,35 @@
     hint.textContent = 'Загрузка ассетов идёт дольше обычного — ждём полного прелоада';
   }, 45000);
 
-  // --- hud -------------------------------------------------------------
+  // --- frozen-loop detector --------------------------------------------
+  // If the game stops advancing while unpaused (weak device, stuck script),
+  // show what/where instead of a silently frozen page.
+  var lastFrame = -1, lastFrameAt = Date.now(), freezeShown = false;
+  setInterval(function () {
+    if (!MM.state) return;
+    if (MM.state.paused) { lastFrameAt = Date.now(); lastFrame = MM.state.frame; return; }
+    if (MM.state.frame !== lastFrame) {
+      lastFrame = MM.state.frame; lastFrameAt = Date.now();
+      if (freezeShown) {
+        var fz = document.getElementById('freeze');
+        if (fz) fz.remove();
+        freezeShown = false;
+      }
+      return;
+    }
+    if (!freezeShown && Date.now() - lastFrameAt > 5000) {
+      freezeShown = true;
+      var d = document.createElement('div');
+      d.id = 'freeze';
+      d.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.82);color:#ffe27a;font:14px Consolas,monospace;text-align:center;padding:20px';
+      d.innerHTML = '<div>Игра не отвечает.<br>Комната: ' + (MM.state.room ? MM.state.room.name : '?') +
+        ' · кадр ' + MM.state.frame + ' · сборка ' + BUILD +
+        (MM._loopErr ? '<br>Ошибка: ' + MM._loopErr : '') +
+        '<br><br><button onclick="location.reload()" style="font:14px Consolas;padding:8px 18px;background:#15151f;color:#ddd;border:1px solid #55556a;border-radius:4px;cursor:pointer">Перезапустить</button></div>';
+      document.body.appendChild(d);
+    }
+  }, 1000);
+
   setInterval(function () {
     if (!MM.state || !MM.state.room) return;
     var audio = '';
