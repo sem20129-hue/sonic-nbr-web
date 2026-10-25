@@ -1872,7 +1872,9 @@
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
-    ctx.fillStyle = room.bgColor || '#000000';
+    // Bars outside the authored view are always black.  The room's own bgcolor
+    // is only painted inside the view rectangle (see below).
+    ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, W, H);
     if (MM.loading && MM.loading.total) {
       var L = MM.loading;
@@ -1899,10 +1901,45 @@
     MM.globals.HUD_Dlg = 0;
     MM.globals.HUD_DlgScale = 1;
     var sx = Math.round(MM.fx.shakeX), sy = Math.round(MM.fx.shakeY);
+    // The room background color belongs to the game view, not to the bars.
+    if (view.px > 0 || view.py > 0 || view.pw < W || view.ph < H) {
+      ctx.fillStyle = room.bgColor || '#000000';
+      ctx.fillRect(view.px, view.py, view.pw, view.ph);
+    }
     var drawables = MM.state.instances
       .filter(function (i) { return !i._destroyed && !i._deactivated && i.visible; })
       .slice()
       .sort(function (a, b) { return b.depth - a.depth; });
+    var hudDrawables = drawables.filter(function (o) {
+      return o.object_name === 'HUDer' || o.object_name === 'Timer';
+    });
+    // Screen-anchored UI pass: drawn with the camera pinned to 0 so camera
+    // shake/rounding cannot make the score/lives/timer jitter.  It is inserted
+    // exactly where the HUD objects sit in the depth order (before the
+    // dialogue panel, which is the topmost layer), not after everything.
+    var hudDrawn = false;
+    var drawHudPass = function () {
+      if (!hudDrawables.length) return;
+      var hvx = MM.view.xview[0], hvy = MM.view.yview[0];
+      MM.view.xview[0] = 0;
+      MM.view.yview[0] = 0;
+      ctx.save();
+      ctx.imageSmoothingEnabled = false;
+      ctx.globalAlpha = 1;
+      ctx.setTransform(view.sx, 0, 0, view.sy,
+        Math.round(view.px), Math.round(view.py));
+      MM.gfxCtx = ctx;
+      for (var hd = 0; hd < hudDrawables.length; hd++) {
+        var hu = hudDrawables[hd];
+        if (hu._destroyed) continue;
+        if (MM.eventCode(hu.object_index, 'draw')) MM.runEvent(hu, 'draw');
+        else if (hu.sprite_index) MM.gfx.drawSelf(ctx, hu);
+      }
+      ctx.restore();
+      MM.gfxCtx = ctx;
+      MM.view.xview[0] = hvx;
+      MM.view.yview[0] = hvy;
+    };
 
     ctx.save();
     ctx.imageSmoothingEnabled = false;
@@ -1939,6 +1976,13 @@
     for (var i = 0; i < drawables.length; i++) {
       var inst = drawables[i];
       while (tIdx < tileDraw.length && tileDraw[tIdx].d > inst.depth) drawRoomTile(ctx, tileDraw[tIdx++]);
+      // Screen UI (score/lives/timer) is drawn in a separate stable pass, so
+      // camera shake and sub-pixel scrolling cannot make it jitter.  Run it
+      // here, at the HUD's place in the draw order.
+      if (inst.object_name === 'HUDer' || inst.object_name === 'Timer') {
+        if (!hudDrawn) { hudDrawn = true; drawHudPass(); }
+        continue;
+      }
       if (MM.eventCode(inst.object_index, 'draw')) {
         if (ex && inst.object_name === 'HUDer') {
           // The HUD compensates the camera with view_xview; keep it pinned to
@@ -1963,6 +2007,10 @@
     if (MM.gfx.drawBackgrounds) MM.gfx.drawBackgrounds(ctx, room, vx, vy, true);
     if (MM.debugKinds) drawKindOverlay(ctx, vx, vy, vw, vh);
     ctx.restore();
+
+    // Safety net: if the depth-ordered pass never reached the HUD objects
+    // (e.g. a room where they are culled), draw it now.
+    if (!hudDrawn) drawHudPass();
 
     // GUI-слой
     ctx.save();
@@ -2146,6 +2194,17 @@
         window.addEventListener('focus', wake);
       }
       var lastLoop = 0;
+      var nowMs = function () {
+        return (typeof performance !== 'undefined' ? performance.now() : Date.now());
+      };
+      // One game step costs a few ms on a desktop and tens of ms on a weak
+      // laptop.  Chasing the wall clock with a fixed five steps per frame turns
+      // any slow frame into a cascade: the browser spends all its time in
+      // script, rAF is delayed, more steps are queued...  (That looked like a
+      // completely frozen browser while paging dialogue.)  Track the real step
+      // cost and scale the catch-up budget down; on a very slow machine run a
+      // single step per frame and simply let the game run slower.
+      var stepCost = 6;
       var drive = function (t) {
         if (!MM.state.running) return;
         if (MM.state.paused) { last = t; acc = 0; return; }
@@ -2153,11 +2212,32 @@
         var dt = t - last; last = t;
         if (!(dt > 0) || dt > 250) dt = stepMs;
         acc += dt;
+        var maxSteps = 5;
+        if (stepCost > 22) maxSteps = 2;
+        if (stepCost > 55) maxSteps = 1;
         var guard = 0;
-        while (acc >= stepMs && guard++ < 5) {
+        while (acc >= stepMs && guard++ < maxSteps) {
+          var t0 = nowMs();
           MM.step();
+          var d = nowMs() - t0;
+          stepCost = stepCost * 0.8 + d * 0.2;
+          if (d > 250) {
+            MM._slow = {
+              room: MM.state.room && MM.state.room.name,
+              frame: MM.state.frame,
+              ms: Math.round(d),
+              page: (function () {
+                var s = MM.query && MM.query('SW')[0];
+                return s ? s.Page : null;
+              })(),
+              inst: MM.state.instances.length
+            };
+          }
           acc -= stepMs;
         }
+        // Drop a backlog we cannot work off this frame instead of carrying it
+        // forever (a slow device must not accumulate minutes of game time).
+        if (acc > stepMs * 3) acc = 0;
         MM.renderFrame();
       };
       var loop = function (t) {
@@ -2167,16 +2247,20 @@
       requestAnimationFrame(loop);
       // Watchdog: some embedded browsers/webviews throttle or stop rAF even
       // while the page is visible; without it the game looked frozen after the
-      // loading screen disappeared.  Drive the same loop from a timer whenever
-      // rAF has been silent for 200 ms.
+      // loading screen disappeared.  It must stay a rare fallback: running the
+      // normal loop from a timer while the real browser frame is merely slow
+      // doubled the work per frame and could lock the page up.
       if (typeof setInterval === 'function') {
+        var lastWatch = 0;
         setInterval(function () {
           if (!MM.state.running) return;
           if (typeof document !== 'undefined' && document.hidden) return;
-          var now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
-          if (now - lastLoop <= 200) return;
+          var now = nowMs();
+          if (now - lastLoop <= 800) return;
+          if (now - lastWatch < 700) return;
+          lastWatch = now;
           try { drive(now); } catch (e) { if (!MM._loopErr) MM._loopErr = String(e && e.message); }
-        }, 50);
+        }, 100);
       }
     }
     return MM;

@@ -1806,6 +1806,50 @@
         '!place_meeting(x + 35, bbox_bottom + 10, Solid_Mask) && !place_meeting(x + 35, bbox_bottom + 10, Break_Mask) && !place_meeting(x + 35, bbox_bottom + 10, Solid_Line)');
       out = out.replace(/!place_meeting\(x - 35, bbox_bottom \+ 10, Solid_Mask\) && !place_meeting\(x - 35, bbox_bottom \+ 10, Break_Mask\)/g,
         '!place_meeting(x - 35, bbox_bottom + 10, Solid_Mask) && !place_meeting(x - 35, bbox_bottom + 10, Break_Mask) && !place_meeting(x - 35, bbox_bottom + 10, Solid_Line)');
+      // Thin-wall support: Scrap Brain walls are often a 1-px Solid_Line
+      // collision strip hidden under the artwork.  The original probes 35 px
+      // from the hero's centre -- 11 px past his body -- which never reaches
+      // such a strip, so every climb was cancelled on the next step and the
+      // hero was left stuck inside the wall.  Probe relative to the body.
+      out = out.replace(/place_meeting\(x \+ 35, (bbox_bottom \+ 10|y - 40), /g,
+        'place_meeting(bbox_right + 6, $1, ');
+      out = out.replace(/place_meeting\(x - 35, (bbox_bottom \+ 10|y - 40), /g,
+        'place_meeting(bbox_left - 6, $1, ');
+      // Grounded wall climb: the original only starts a climb from a glide, so
+      // walking into a wall (e.g. the Scrap Brain steel walls) just pushed the
+      // hero into the wall.  Start the same climb state when pushing toward a
+      // wall on the ground, but only if the wall continues above the head.
+      var tailAnchor = '    if ((Tornado_Mode == 1) && (ground == 1) && keyboard_check_pressed(ord("Z")) && (HUDer.HUD_Mode == 1))\n' +
+                       '    {\n        vspeed = -6;\n    }\n}';
+      if (out.indexOf('// ground climb fix') < 0 && out.indexOf(tailAnchor) >= 0) {
+        var climb =
+          '    if ((Tornado_Mode == 1) && (ground == 1) && keyboard_check_pressed(ord("Z")) && (HUDer.HUD_Mode == 1))\n' +
+          '    {\n        vspeed = -6;\n    }\n' +
+          '    // ground climb fix\n' +
+          '    if ((Climb == 1) && (ground == 1) && keyboard_check(vk_down) && !keyboard_check(vk_up))\n' +
+          '    {\n        Climb = 0;\n    }\n' +
+          '    if ((Climb == 0) && (Climb2 == 0) && (Glide == 0) && (ground == 1) && (Tornado_Mode == 0) && (Wait_mode == 0) && (Punch == 0))\n' +
+          '    {\n' +
+          '        if (keyboard_check(vk_right) &&\n' +
+          '            (place_meeting(bbox_right + 2, y, Solid_Mask) || place_meeting(bbox_right + 2, y, Break_Mask) || place_meeting(bbox_right + 2, y, Solid_Line)) &&\n' +
+          '            (place_meeting(bbox_right + 2, y - 28, Solid_Mask) || place_meeting(bbox_right + 2, y - 28, Break_Mask) || place_meeting(bbox_right + 2, y - 28, Solid_Line)))\n' +
+          '        {\n            Climb = 1;\n            global.vel = 0;\n        }\n' +
+          '        if (keyboard_check(vk_left) &&\n' +
+          '            (place_meeting(bbox_left - 2, y, Solid_Mask) || place_meeting(bbox_left - 2, y, Break_Mask) || place_meeting(bbox_left - 2, y, Solid_Line)) &&\n' +
+          '            (place_meeting(bbox_left - 2, y - 28, Solid_Mask) || place_meeting(bbox_left - 2, y - 28, Break_Mask) || place_meeting(bbox_left - 2, y - 28, Solid_Line)))\n' +
+          '        {\n            Climb = 1;\n            global.vel = 0;\n        }\n' +
+          '    }\n' +
+          '}';
+        out = out.replace(tailAnchor, climb);
+      }
+      // While hanging on a wall the hero must not keep the horizontal speed he
+      // had when the glide ended: with right held the old code added `x++` plus
+      // the regular run velocity, so climbing looked twice as fast.  Climb is
+      // purely vertical (plus the 1-px wall contact push).
+      if (out.indexOf('// climb speed fixed') < 0) {
+        out = out.replace('    if (Climb == 1)\n    {\n',
+          '    if (Climb == 1)\n    {\n        global.vel = 0; // climb speed fixed\n');
+      }
       MM.scripts['KnucklesAction'] = out;
     }
   }
@@ -1964,6 +2008,64 @@
       '{\n' + s + '\n}\n';
   }
 
+  // Scrap Brain turns bloody after the screamer.  The original does
+  // `YCR_Ground.sprite_index = sprYCR_GroundBlood` and the same for the walls
+  // and the ceiling, but in GML that only touches the FIRST instance of the
+  // object.  The level is assembled from hundreds of 256-px ground/wall pieces,
+  // so only one tile changed and the rest of the room stayed clean -- the
+  // "where is the blood?" report.  Swap every piece instead.
+  function patchBloodyScrapBrain() {
+    var b = MM.codeBundle;
+    if (!b) return;
+    var keys = ['gml_Object_MYCR_TotalObj_Alarm_2', 'gml_Object_MYCR_DL_Exetior_Create_0'];
+    for (var i = 0; i < keys.length; i++) {
+      var s = b[keys[i]];
+      if (typeof s !== 'string' || s.indexOf('// blood all') >= 0) continue;
+      s = s.replace(/YCR_Ground\.sprite_index = (spr\w+);/g,
+                    'with (YCR_Ground) { sprite_index = $1; } // blood all');
+      s = s.replace(/YCR_SideWalls\.sprite_index = (spr\w+);/g,
+                    'with (YCR_SideWalls) { sprite_index = $1; } // blood all');
+      s = s.replace(/YCR_Ceiling\.sprite_index = (spr\w+);/g,
+                    'with (YCR_Ceiling) { sprite_index = $1; } // blood all');
+      s = s.replace(/GHZ_DeadAnimal1\.image_alpha = 1;/g,
+                    'with (GHZ_DeadAnimal1) { image_alpha = 1; } // blood all');
+      b[keys[i]] = s + '\n// blood all';
+    }
+  }
+
+  // Cut-scene punch: Sonic is thrown into the breakable columns.  The column
+  // destroys itself in its collision event, and because that instance is gone
+  // the engine never runs Sonic's own collision event (which stops him, plays
+  // the "lay tired" sprite and schedules the next dialogue).  He kept hspeed
+  // -8 and flew off into the empty level ("летит в открытую пустоту").
+  // Run the same hit response from the column before it breaks.
+  function patchCutsceneWallHit() {
+    var b = MM.codeBundle;
+    if (!b) return;
+    var key = 'gml_Object_YCR_BrokeWall1_Collision_388';
+    var s = b[key];
+    if (typeof s !== 'string' || s.indexOf('// stop punched sonic') >= 0) return;
+    var stop =
+      'if (instance_exists(MYCR_Sonic)) // stop punched sonic\n' +
+      '{\n' +
+      '    with (MYCR_Sonic)\n' +
+      '    {\n' +
+      '        if (Act == 1)\n' +
+      '        {\n' +
+      '            sprite_index = sprSonicLayTired1;\n' +
+      '            Act = 2;\n' +
+      '            hspeed = 0;\n' +
+      '            y += 5;\n' +
+      '            image_speed = 0;\n' +
+      '            view_object[0] = Pers_Obj;\n' +
+      '            image_index = 0;\n' +
+      '            alarm[1] = 140;\n' +
+      '        }\n' +
+      '    }\n' +
+      '}\n';
+    b[key] = stop + s;
+  }
+
   MM.nbrBoot = function (opts) {
     patchSpringContacts();
     patchBirdFacing();
@@ -1973,6 +2075,8 @@
     patchGlideTurn();
     patchDialogAdvance();
     patchCutsceneWalls();
+    patchCutsceneWallHit();
+    patchBloodyScrapBrain();
     patchWideUI();
     opts = opts || {};
     MM.VIEW_W = opts.width || 640;
