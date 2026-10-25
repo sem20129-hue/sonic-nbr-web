@@ -1436,7 +1436,16 @@
       jobs.push({ kind: 'bg', src: url });
     }
 
-    // 4. audio: bytes only, decoded on first play
+    // 4. bitmap fonts (otherwise the first dialog/HUD text pops in late)
+    var fonts = MM.fonts || {};
+    for (n in fonts) {
+      var fnt = fonts[n];
+      if (!fnt || !fnt.src || fnt.img || seen['fnt' + fnt.src]) continue;
+      seen['fnt' + fnt.src] = 1;
+      jobs.push({ kind: 'font', src: fnt.src, obj: fnt });
+    }
+
+    // 5. audio: bytes only, decoded on first play
     var sounds = MM.soundFiles || {};
     for (n in sounds) {
       var def = sounds[n];
@@ -1518,6 +1527,15 @@
           else {
             im.addEventListener('load', function () { once(true); });
             im.addEventListener('error', function () { once(false); });
+          }
+        } else if (job.kind === 'font') {
+          var ff = job.obj;
+          if (ff.img) once(true);
+          else {
+            var fim = new Image();
+            fim.onload = function () { ff.img = fim; once(true); };
+            fim.onerror = function () { once(false); };
+            fim.src = job.src;
           }
         } else if (job.kind === 'snd') {
           if (MM.audio && MM.audio.prefetchFile) MM.audio.prefetchFile(job.src, function (ok) { once(ok); });
