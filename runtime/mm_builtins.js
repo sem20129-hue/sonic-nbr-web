@@ -281,7 +281,7 @@
       if (o === inst || o._destroyed || o._deactivated) continue;
       if (MM.isLevelSolid && !MM.isLevelSolid(o.object_index)) continue;
       var ob = MM.bbox(o);
-      if (ob && box.l < ob.r && box.r > ob.l && box.t < ob.b && box.b > ob.t) return true;
+      if (ob && box.l <= ob.r && box.r >= ob.l && box.t <= ob.b && box.b >= ob.t) return true;
     }
     return false;
   }
@@ -299,17 +299,32 @@
     // player stayed a few pixels inside the floor and could not walk; with an
     // extra pixel it hovered and jittered.
     if (touchesSolid(me, me.x, me.y)) {
-      // GM pushes the instance out of the solid; the maxdist limit applies to
-      // the forward travel, not to the escape.  Landing at speed sinks the
-      // hero several pixels into the floor and the old 4px cap left him
-      // overlapping -- which tripped the game's wall branch and zeroed the
-      // horizontal speed on every landing.  The cap stays small: an unlimited
-      // escape teleported the hero tens of pixels out of nearby geometry.
-      var escape = 0;
-      while (escape < 16 && touchesSolid(me, me.x - dx, me.y - dy)) {
-        me.x -= dx; me.y -= dy; escape++;
+      // Only undo penetration along the requested axis and only against the
+      // surface the hero actually came through: a downward snap pops him onto
+      // the floor, an upward one drops him off a ceiling.  The old back-off
+      // loop also walked him up tall walls ("стены выталкивают").
+      var vbox = MM.bbox(me);
+      if (!vbox) return 0;
+      var solids = MM.levelSolids();
+      var pen = 0, found = false;
+      for (var si = 0; si < solids.length; si++) {
+        var so = solids[si];
+        if (so === me || so._destroyed || so._deactivated) continue;
+        var sb = MM.bbox(so);
+        if (!sb) continue;
+        if (vbox.l > sb.r || vbox.r < sb.l) continue;
+        if (dy > 0) {
+          var p = vbox.b - sb.t;
+          if (p >= 0 && p <= 32) { found = true; if (p > pen) pen = p; }
+        } else if (dy < 0) {
+          var p2 = sb.b - vbox.t;
+          if (p2 >= 0 && p2 <= 32) { found = true; if (p2 > pen) pen = p2; }
+        }
       }
-      if (escape < 16) { me.x -= dx; me.y -= dy; }
+      // Also normalise "standing exactly on the surface" (pen = 0) to a one
+      // pixel gap: GM's inclusive boxes otherwise report the floor as a wall
+      // for every probe at the same height (that cancelled the spindash).
+      if (found) { me.y -= (dy > 0 ? pen + 1 : -(pen + 1)); }
       return 0;
     }
     // GameMaker advances in whole pixels and never exceeds maxdist, so

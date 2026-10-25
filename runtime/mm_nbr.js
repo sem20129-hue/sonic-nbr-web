@@ -326,6 +326,9 @@
     var sy = inst.image_yscale || 1;
     var ly0 = Math.floor((box.t - inst.y) / (sy || 1) + oy);
     var ly1 = Math.ceil((box.b - inst.y) / (sy || 1) + oy);
+    // Mirrored/negative scale flips the row and run order; normalise before
+    // clamping, otherwise looking left made the whole mask test miss.
+    if (ly0 > ly1) { var ty = ly0; ly0 = ly1; ly1 = ty; }
     if (ly0 < 0) ly0 = 0;
     if (ly1 > m.h - 1) ly1 = m.h - 1;
     for (var ly = ly0; ly <= ly1; ly++) {
@@ -334,6 +337,7 @@
       for (var i = 0; i < runs.length; i++) {
         var wx0 = inst.x + (runs[i][0] - ox) * sx;
         var wx1 = inst.x + (runs[i][1] + 1 - ox) * sx;
+        if (wx0 > wx1) { var tx = wx0; wx0 = wx1; wx1 = tx; }
         if (wx0 < box.r && wx1 > box.l) return true;
       }
     }
@@ -341,8 +345,8 @@
   }
 
   MM.collides = function (a, b, boxA, boxB) {
-    if (!(boxA.l < boxB.r && boxA.r > boxB.l && boxA.t < boxB.b && boxA.b > boxB.t)) return false;
-    var sprA = a.sprite_index, sprB = b.sprite_index;
+    if (!(boxA.l <= boxB.r && boxA.r >= boxB.l && boxA.t <= boxB.b && boxA.b >= boxB.t)) return false;
+    var sprA = a.mask_index || a.sprite_index, sprB = b.mask_index || b.sprite_index;
     var mA = (a.object_index && a.object_index.maskKind === 'mask') ? maskHit(sprA) : null;
     var mB = (b.object_index && b.object_index.maskKind === 'mask') ? maskHit(sprB) : null;
     if (!mA && !mB) return true;

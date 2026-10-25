@@ -612,14 +612,12 @@
     return out;
   };
 
-  // GML bbox_right/bbox_bottom — включительно: касание краями считается столкновением.
-  // Two masks only collide when they actually share pixels: an instance whose
-  // last row equals the other's first row is *adjacent*, not overlapping.
-  // Inclusive comparison here made the player 1px "inside" the floor after a
-  // landing, and the floor then blocked every horizontal step (the "stops and
-  // can only move after a jump" bug).
+  // GML bounding boxes are inclusive pixel ranges: two masks that share an
+  // edge row DO collide.  The resting position is therefore one pixel above
+  // the floor (see move_contact_solid), which keeps horizontal probes and the
+  // spindash rectangle clear of the ground.
   function boxesOverlap(a, b) {
-    return a.l < b.r && a.r > b.l && a.t < b.b && a.b > b.t;
+    return a.l <= b.r && a.r >= b.l && a.t <= b.b && a.b >= b.t;
   }
 
 
@@ -633,7 +631,7 @@
         var o = list[i];
         if (o._destroyed) continue;
         var ob = MM.bbox(o);
-        if (!ob || ob.l >= r || ob.r <= l || ob.t >= b || ob.b <= t) continue;
+        if (!ob || ob.l > r || ob.r < l || ob.t > b || ob.b < t) continue;
         if (cb(o, ob)) return true;
       }
       return false;
@@ -647,8 +645,8 @@
     }
     for (var j = lo; j < es.length; j++) {
       var e = es[j];
-      if (e.l >= r) break;
-      if (e.r <= l || e.t >= b || e.b <= t) continue;
+      if (e.l > r) break;
+      if (e.r < l || e.t > b || e.b < t) continue;
       if (e.o._destroyed) continue;
       if (cb(e.o, e)) return true;
     }
@@ -656,7 +654,7 @@
       var d = rec.dyn[k];
       if (d._destroyed) continue;
       var db = MM.bbox(d);
-      if (!db || db.l >= r || db.r <= l || db.t >= b || db.b <= t) continue;
+      if (!db || db.l > r || db.r < l || db.t > b || db.b < t) continue;
       if (cb(d, db)) return true;
     }
     return false;
