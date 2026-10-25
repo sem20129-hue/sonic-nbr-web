@@ -1684,6 +1684,12 @@
       out = out.replace(/view_xview\[0\] \+ (2[5-9]0|300)\b/g, function (m, n) {
         return 'view_xview[0] + ' + n + ' + (view_wview[0] - 320)';
       });
+      // Right-edge spawn/cull checks were hardcoded to the 320-wide view: with
+      // a 463-wide view those effects spawned inside the visible area (pop-in)
+      // and the parallax rows ended mid-screen.
+      out = out.replace(/view_xview\[0\] \+ 330/g, 'view_xview[0] + view_wview[0] + 10');
+      out = out.replace(/view_xview\[0\] \+ 320/g, 'view_xview[0] + view_wview[0]');
+      out = out.replace(/room_width - 320/g, 'room_width - view_wview[0]');
       return out;
     }
     if (b) {
