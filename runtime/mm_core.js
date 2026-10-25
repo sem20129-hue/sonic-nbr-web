@@ -1753,6 +1753,10 @@
     var view = MM.activeView();
     var vx = view.x, vy = view.y, vw = view.w, vh = view.h;
     var ex = view.extra || 0;
+    // Effective width of the visible game area, used by the HUD/cutscene
+    // anchors so they sit on the real screen corners in every mode.
+    if (!MM.globals) MM.globals = {};
+    MM.globals.HUD_Wide = view.w;
     var sx = Math.round(MM.fx.shakeX), sy = Math.round(MM.fx.shakeY);
     var drawables = MM.state.instances
       .filter(function (i) { return !i._destroyed && !i._deactivated && i.visible; })

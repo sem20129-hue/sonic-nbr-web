@@ -1760,11 +1760,11 @@
   // composition, so centre them instead of leaving them glued to the left.
   function patchWideUI() {
     var b = MM.codeBundle;
-    var off = '(view_wview[0] - 320) / 2';
+    var off = '(global.HUD_Wide - 320) / 2';
     function widen(src) {
       var out = src.replace(/view_xview\[0\] \+ 160/g, 'view_xview[0] + ' + off + ' + 160');
       out = out.replace(/view_xview\[0\] \+ (2[5-9]0|300)\b/g, function (m, n) {
-        return 'view_xview[0] + ' + n + ' + (view_wview[0] - 320)';
+        return 'view_xview[0] + ' + n + ' + (global.HUD_Wide - 320)';
       });
       // Right-edge spawn/cull checks were hardcoded to the 320-wide view: with
       // a 463-wide view those effects spawned inside the visible area (pop-in)
