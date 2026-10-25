@@ -1416,7 +1416,23 @@
     for (var w = 0; w < width; w++) pump();
   };
 
+  // Vertical springs in the original only fire while the hero is falling
+  // (Pers_Obj.vspeed > 0), so walking into one on the ground went straight
+  // through it.  Treat grounded contact as a valid hit too.
+  function patchSpringContacts() {
+    var b = MM.codeBundle;
+    if (!b) return;
+    for (var k in b) {
+      if (k.indexOf('Spring') < 0 || !/_Collision_35$/.test(k)) continue;
+      var src = b[k];
+      if (typeof src !== 'string') continue;
+      if (src.indexOf('Pers_Obj.vspeed > 0') < 0) continue;
+      b[k] = src.replace(/Pers_Obj\.vspeed > 0/g, '(Pers_Obj.vspeed > 0 || Pers_Obj.ground == 1)');
+    }
+  }
+
   MM.nbrBoot = function (opts) {
+    patchSpringContacts();
     opts = opts || {};
     MM.VIEW_W = opts.width || 640;
     MM.VIEW_H = opts.height || 480;

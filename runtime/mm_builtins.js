@@ -268,13 +268,18 @@
     if (me) MM.motionAdd(me, num(a[0]), num(a[1]));
     return 0;
   };
+  // move_contact_solid is level geometry only.  Springs/interactive props are
+  // flagged solid in the original too, but treating them as walls made the
+  // ground snap shove the hero tens of pixels out of them ("я иду сквозь
+  // пружины" / телепорты у стен).
   function touchesSolid(inst, x, y) {
     var box = MM.bbox(inst, x, y);
     if (!box) return false;
-    var list = MM.state.instances;
+    var list = MM.levelSolids ? MM.levelSolids() : MM.state.instances;
     for (var i = 0; i < list.length; i++) {
       var o = list[i];
-      if (o === inst || o._destroyed || !o.solid) continue;
+      if (o === inst || o._destroyed || o._deactivated) continue;
+      if (MM.isLevelSolid && !MM.isLevelSolid(o.object_index)) continue;
       var ob = MM.bbox(o);
       if (ob && box.l < ob.r && box.r > ob.l && box.t < ob.b && box.b > ob.t) return true;
     }
@@ -298,12 +303,13 @@
       // the forward travel, not to the escape.  Landing at speed sinks the
       // hero several pixels into the floor and the old 4px cap left him
       // overlapping -- which tripped the game's wall branch and zeroed the
-      // horizontal speed on every landing.
+      // horizontal speed on every landing.  The cap stays small: an unlimited
+      // escape teleported the hero tens of pixels out of nearby geometry.
       var escape = 0;
-      while (escape < 128 && touchesSolid(me, me.x - dx, me.y - dy)) {
+      while (escape < 16 && touchesSolid(me, me.x - dx, me.y - dy)) {
         me.x -= dx; me.y -= dy; escape++;
       }
-      if (escape < 128) { me.x -= dx; me.y -= dy; }
+      if (escape < 16) { me.x -= dx; me.y -= dy; }
       return 0;
     }
     // GameMaker advances in whole pixels and never exceeds maxdist, so

@@ -436,6 +436,7 @@
   function Scope(parent) {
     this.vars = Object.create(null);
     this.parent = parent || null;
+    this.count = 0;
   }
   Scope.prototype.has = function (name) {
     var s = this;
@@ -459,7 +460,9 @@
   Scope.prototype.read = function (name) {
     var s = this;
     while (s) {
-      if (name in s.vars) return s.vars[name];
+      var vars = s.vars;
+      var v = vars[name];
+      if (v !== undefined || (name in vars)) return v;
       s = s.parent;
     }
     return NOT_FOUND;
@@ -481,6 +484,7 @@
       s = s.parent;
     }
     this.vars[name] = v;
+    this.count++;
   };
 
   function isInstance(v) {
@@ -553,14 +557,13 @@
       return gv === undefined ? 0 : gv;
     }
     var self = ctx.self;
-    if (self && typeof self === 'object') {
+    if (self) {
       // speed/direction are live views over hspeed/vspeed in GameMaker.
       if (name === 'speed') return MM.motionSpeed(self);
       if (name === 'direction') return MM.motionDirection(self);
-      if (name in self) {
-        var v = self[name];
-        return v === undefined ? 0 : v;
-      }
+      var v = self[name];
+      if (v !== undefined) return v;
+      if (name in self) return 0;
     }
     if (MM.builtinVars && MM.builtinVars[name]) return MM.builtinVars[name].get(ctx);
     if (MM.constants && (name in MM.constants)) return MM.constants[name];
@@ -621,6 +624,20 @@
     var i;
     if (callee.type === 'id') {
       var name = callee.name;
+      // Resolve builtins/scripts once per call site; only an actual local
+      // variable can shadow them (the scope counter tells us when to look).
+      var direct = callee._direct;
+      if (direct === undefined) {
+        if (MM.builtins && MM.builtins[name]) direct = { b: MM.builtins[name] };
+        else if (MM.scripts[name] != null) direct = { s: name };
+        else direct = null;
+        callee._direct = direct;
+      }
+      if (direct && !(ctx.scope && ctx.scope.count > 0 && ctx.scope.has(name))) {
+        args = [];
+        for (i = 0; i < node.args.length; i++) args.push(evalExpr(node.args[i], ctx));
+        return direct.b ? direct.b(ctx, args) : runScript(name, ctx, args);
+      }
       // локальные/переменные, если там функция
       if (ctx.scope && ctx.scope.has(name)) {
         var v = ctx.scope.get(name);

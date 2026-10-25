@@ -433,15 +433,25 @@
     game_start: 'other_game_start', game_end: 'other_game_end'
   };
 
+  // Every instance asks for its events every frame; walking the parent chain
+  // and resolving aliases each time dominated the profile.  The answer only
+  // depends on (object def, event name), so cache it on the def.
   MM.eventCode = function (def, evName) {
+    if (!def) return null;
+    var cache = def._eventCode;
+    if (!cache) cache = def._eventCode = Object.create(null);
+    var hit = cache[evName];
+    if (hit !== undefined) return hit;
+    var code = null;
     var alias = EV_ALIAS[evName];
     var d = def;
     while (d) {
-      if (d.events && typeof d.events[evName] === 'string' && d.events[evName].length) return MM.resolveCode(d.events[evName]);
-      if (alias && d.events && typeof d.events[alias] === 'string' && d.events[alias].length) return MM.resolveCode(d.events[alias]);
+      if (d.events && typeof d.events[evName] === 'string' && d.events[evName].length) { code = MM.resolveCode(d.events[evName]); break; }
+      if (alias && d.events && typeof d.events[alias] === 'string' && d.events[alias].length) { code = MM.resolveCode(d.events[alias]); break; }
       d = d.parent ? MM.resolveObject(d.parent) : null;
     }
-    return null;
+    cache[evName] = code;
+    return code;
   };
 
   // -------------------------------------------------------------------
@@ -777,8 +787,8 @@
   // -------------------------------------------------------------------
   // Шаг мира
   // -------------------------------------------------------------------
-  function tickAlarms() {
-    var list = MM.state.instances;
+  function tickAlarms(instList) {
+    var list = instList || MM.state.instances;
     for (var i = 0; i < list.length; i++) {
       var inst = list[i];
       if (inst._destroyed) continue;
@@ -801,6 +811,8 @@
     for (var i = 0; i < list.length; i++) {
       var inst = list[i];
       if (inst._destroyed) continue;
+      // Static scenery (most of the level) takes a fast path.
+      if (!inst.gravity && !inst.friction && !inst.hspeed && !inst.vspeed) continue;
       if (inst.gravity) {
         var rad = inst.gravity_direction * Math.PI / 180;
         inst.hspeed += inst.gravity * Math.cos(rad);
@@ -837,18 +849,38 @@
 
   function isLevelSolid(def) {
     if (!def) return false;
-    return MM.objectChainHas(def, MM.objects['Solid_Mask']) ||
-           MM.objectChainHas(def, MM.objects['Break_Mask']);
+    if (def._levelSolid === undefined) {
+      var sm = MM.objects['Solid_Mask'], bm = MM.objects['Break_Mask'];
+      def._levelSolid = !!((sm && MM.objectChainHas(def, sm)) || (bm && MM.objectChainHas(def, bm)));
+    }
+    return def._levelSolid;
   }
+  MM.isLevelSolid = isLevelSolid;
+
+  // Static-ish list of level geometry, rebuilt only when instances are created
+  // or destroyed (not every frame).  Contact queries used to scan all 1800+
+  // instances on every ground probe.
+  MM.levelSolids = function () {
+    var st = MM.state;
+    if (st._levelSolids && st._levelSolidsVersion === st.version) return st._levelSolids;
+    var list = [];
+    for (var i = 0; i < st.instances.length; i++) {
+      var o = st.instances[i];
+      if (o._destroyed || o._deactivated) continue;
+      if (isLevelSolid(o.object_index)) list.push(o);
+    }
+    st._levelSolids = list;
+    st._levelSolidsVersion = st.version;
+    return list;
+  };
 
   function overlapsLevelSolid(inst, x, y) {
     var box = MM.bbox(inst, x, y);
     if (!box) return false;
-    var list = MM.state.instances;
+    var list = MM.levelSolids();
     for (var i = 0; i < list.length; i++) {
       var o = list[i];
       if (o === inst || o._destroyed || o._deactivated) continue;
-      if (!isLevelSolid(o.object_index)) continue;
       var ob = MM.bbox(o);
       if (ob && box.l < ob.r && box.r > ob.l && box.t < ob.b && box.b > ob.t) return true;
     }
@@ -936,6 +968,10 @@
     for (var i = 0; i < list.length; i++) {
       var inst = list[i];
       if (inst._destroyed || inst._deactivated) continue;
+      // Cheap origin test first: a bbox always contains the origin, so an
+      // instance well inside the room cannot be fully outside it.  This saved
+      // a bbox computation (and mask lookup) for every scenery instance.
+      if (inst.x > 0 && inst.x < room.w && inst.y > 0 && inst.y < room.h) continue;
       var b = MM.bbox(inst);
       if (!b) continue;
       if (b.r < 0 || b.b < 0 || b.l > room.w || b.t > room.h) {
@@ -1113,9 +1149,63 @@
     }
   }
 
+  function anyObjectHasEvent(name) {
+    for (var k in MM.objects) {
+      var d = MM.objects[k];
+      if (!d || !d.events) continue;
+      if (typeof d.events[name] === 'string' && d.events[name].length) return true;
+    }
+    return false;
+  }
+
+  // Per-frame event dispatch used to walk all ~1800 instances for step /
+  // alarms / begin_step even though only a couple hundred define them.  Build
+  // the per-event instance lists once per instance-version.
+  function eventInstanceList(name) {
+    var st = MM.state;
+    var c = st._evLists || (st._evLists = {});
+    var rec = c[name];
+    if (rec && rec.v === st.version) return rec.list;
+    var list = [];
+    for (var i = 0; i < st.instances.length; i++) {
+      var o = st.instances[i];
+      if (o._destroyed) continue;
+      if (MM.eventCode(o.object_index, name)) list.push(o);
+    }
+    c[name] = { v: st.version, list: list };
+    return list;
+  }
+
+  function hasAnyAlarm(def) {
+    if (!def) return false;
+    if (def._hasAlarm === undefined) {
+      var any = false;
+      for (var a = 0; a < 12; a++) if (MM.eventCode(def, 'alarm' + a)) { any = true; break; }
+      def._hasAlarm = any;
+    }
+    return def._hasAlarm;
+  }
+
+  function alarmInstanceList() {
+    var st = MM.state;
+    if (st._alarmList && st._alarmList.v === st.version) return st._alarmList.list;
+    var list = [];
+    for (var i = 0; i < st.instances.length; i++) {
+      var o = st.instances[i];
+      if (o._destroyed) continue;
+      if (hasAnyAlarm(o.object_index)) list.push(o);
+    }
+    st._alarmList = { v: st.version, list: list };
+    return list;
+  }
+
   MM.step = function () {
     if (MM.loading && MM.loading.total) return;
     if (MM.state.paused) { MM.clearInputFrame(); return; }
+    if (MM._hasBeginStep === undefined) {
+      MM._hasBeginStep = anyObjectHasEvent('begin_step');
+      MM._hasEndStep = anyObjectHasEvent('end_step');
+    }
     MM.state.frame++;
     MM.state.frameInRoom++;
     var list;
@@ -1125,18 +1215,22 @@
     for (i = 0; i < list.length; i++) {
       if (!list[i]._destroyed && isPlayerInst(list[i])) { list[i]._px = list[i].x; list[i]._py = list[i].y; }
     }
-    list = MM.state.instances.slice();
-    for (i = 0; i < list.length; i++) if (!list[i]._destroyed) MM.runEvent(list[i], 'begin_step');
-    tickAlarms();
-    list = MM.state.instances.slice();
-    for (i = 0; i < list.length; i++) if (!list[i]._destroyed) MM.runEvent(list[i], 'step');
+    if (MM._hasBeginStep) {
+      var bl = eventInstanceList('begin_step').slice();
+      for (i = 0; i < bl.length; i++) if (!bl[i]._destroyed) MM.runEvent(bl[i], 'begin_step');
+    }
+    tickAlarms(alarmInstanceList());
+    var sl = eventInstanceList('step').slice();
+    for (i = 0; i < sl.length; i++) if (!sl[i]._destroyed) MM.runEvent(sl[i], 'step');
     tickPhysics();
     tickPaths();
     tickOutsideRoom();
     tickCollisions();
     resolvePlayerOverlap();
-    list = MM.state.instances.slice();
-    for (i = 0; i < list.length; i++) if (!list[i]._destroyed) MM.runEvent(list[i], 'end_step');
+    if (MM._hasEndStep) {
+      var el = eventInstanceList('end_step').slice();
+      for (i = 0; i < el.length; i++) if (!el[i]._destroyed) MM.runEvent(el[i], 'end_step');
+    }
     tickAnimation();
     flushDestroyed();
     tickFx();
