@@ -1740,18 +1740,32 @@
     }
   }
 
-  // Gliding turn: the decompiled script only flips image_xscale after
-  // global.vel crosses zero, so pressing the opposite direction first brakes
-  // for ~0.5 s and looks like a step backwards.  Face the pressed direction
-  // immediately; the glide acceleration then curves the actual velocity.
+  // Gliding turn: the decompiled glide block re-injects a minimum speed of
+  // 2 px (`if (global.vel == 0) global.vel = image_xscale * 2`) every time the
+  // speed reaches zero.  While turning that snaps 0 -> 2 in the OLD direction,
+  // so the animation frame jumps (2 -> 1 -> 0 -> 1 -> 2) and the motion lurches
+  // twice: exactly the "step back" jerk.  Keep the kick for a free glide, but
+  // skip it while a direction key is held - the normal acceleration then walks
+  // the speed smoothly through zero and the facing flips once, at the crossing.
   function patchGlideTurn() {
     var s = MM.scripts && MM.scripts['KnucklesAction'];
     if (typeof s !== 'string') return;
     if (s.indexOf('// glide turn fixed') >= 0) return;
-    var key = 'if ((Glide == 1) && keyboard_check(ord("Z")))\n{';
+    var key =
+      '        if (global.vel == 0)\n' +
+      '        {\n' +
+      '            global.vel = image_xscale * 2;\n' +
+      '        }';
     if (s.indexOf(key) < 0) return;
-    s = s.replace(key, key +
-      '\n    // glide turn fixed\n    if (keyboard_check(vk_left)) image_xscale = -1;\n    if (keyboard_check(vk_right)) image_xscale = 1;');
+    s = s.replace(key,
+      '        // glide turn fixed\n' +
+      '        if (global.vel == 0)\n' +
+      '        {\n' +
+      '            if (!keyboard_check(vk_left) && !keyboard_check(vk_right))\n' +
+      '            {\n' +
+      '                global.vel = image_xscale * 2;\n' +
+      '            }\n' +
+      '        }');
     MM.scripts['KnucklesAction'] = s;
   }
 
