@@ -1698,6 +1698,17 @@
       if (typeof sw === 'string' && sw.indexOf('// wide fixed') < 0) {
         b[key] = sw.replace(/view_xview\[0\]/g, '(view_xview[0] + ' + off + ')') + '\n// wide fixed';
       }
+      // Metal Sonic pursuit: laser warning columns were at +40/+120/+200/+280,
+      // i.e. only across the old 320-wide view.  Spread them over the 463-wide
+      // view so the right half also gets warnings.
+      var rf = b['gml_Object_RF_MetalPursuit_Step_0'];
+      if (typeof rf === 'string' && rf.indexOf('// wide lasers') < 0) {
+        rf = rf.replace('X1 = view_xview[0] + 40;', 'X1 = view_xview[0] + view_wview[0] * 0.125;')
+               .replace('X2 = view_xview[0] + 120;', 'X2 = view_xview[0] + view_wview[0] * 0.375;')
+               .replace('X3 = view_xview[0] + 200;', 'X3 = view_xview[0] + view_wview[0] * 0.625;')
+               .replace('X4 = view_xview[0] + 280;', 'X4 = view_xview[0] + view_wview[0] * 0.875;');
+        b['gml_Object_RF_MetalPursuit_Step_0'] = rf + '\n// wide lasers';
+      }
       for (var k in b) {
         if (k === key) continue;
         var s = b[k];
