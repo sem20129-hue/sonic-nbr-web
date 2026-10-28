@@ -1763,6 +1763,29 @@
       ctx.globalAlpha = prevAlpha;
       return;
     }
+    // Cut-scene clones are authored as a flicker between a coloured pose and a
+    // greyscale "static" pose.  Drawing the static frame as-is turned the
+    // clones black-and-white; the scene wants noisy ghosts that keep their
+    // colours.  Draw the coloured pose and lay the matching static frame over
+    // it, tinted with the character's colour (multiply keeps the noise).
+    var cloneTint = (!ang && sx === 1 && sy === 1 && !useTint &&
+                     typeof spr.name === 'string' && /^sprMYCR_(Sonic|Tails|Amy|Exetior)Clone$/.test(spr.name))
+      ? ({ sprMYCR_SonicClone: '#4f6bff', sprMYCR_TailsClone: '#e09a2e',
+           sprMYCR_AmyClone: '#e060a0', sprMYCR_ExetiorClone: '#a83240' })[spr.name]
+      : null;
+    if (cloneTint) {
+      var poseIdx = fi - (fi % 2);
+      var pose = buildSpriteCanvas(spr, poseIdx);
+      var noise = MM.spriteTinted(spr, poseIdx + 1, cloneTint);
+      var dx0 = Math.round(x - ox), dy0 = Math.round(y - oy);
+      if (pose) ctx.drawImage(pose, dx0, dy0);
+      if (noise) {
+        ctx.globalAlpha = Math.max(0, Math.min(1, ctx.globalAlpha * 0.5));
+        ctx.drawImage(noise, dx0, dy0);
+      }
+      ctx.globalAlpha = prevAlpha;
+      return;
+    }
     if (ang || sx !== 1 || sy !== 1) {
       ctx.save();
       ctx.translate(x, y);

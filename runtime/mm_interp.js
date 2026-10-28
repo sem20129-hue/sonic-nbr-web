@@ -526,6 +526,16 @@
     return v;
   }
 
+  function setMemberValue(obj, name, value) {
+    if (!obj || typeof obj !== 'object') return;
+    if (name === 'speed') { MM.motionSetSpeed(obj, value); return; }
+    if (name === 'direction') { MM.motionSetDirection(obj, value); return; }
+    if ((name === 'sprite_index' || name === 'mask_index') && typeof value === 'number') {
+      value = MM.resolveSprite(value); // GML may store a raw resource id
+    }
+    obj[name] = value;
+  }
+
   function identValue(name, ctx) {
     switch (name) {
       case 'self': return ctx.self;
@@ -730,15 +740,27 @@
       return;
     }
     if (node.type === 'member') {
-      var obj = instTarget(evalExpr(node.obj, ctx));
-      if (obj && typeof obj === 'object') {
-        var mval = value;
-        if (node.name === 'speed') { MM.motionSetSpeed(obj, mval); return; }
-        if (node.name === 'direction') { MM.motionSetDirection(obj, mval); return; }
-        if ((node.name === 'sprite_index' || node.name === 'mask_index') && typeof mval === 'number') {
-          mval = MM.resolveSprite(mval); // GML may store a raw resource id
+      var rawTarget = evalExpr(node.obj, ctx);
+      // GameMaker semantics: `Object.variable = value` writes the variable to
+      // EVERY live instance of that object (a read still uses the first one).
+      // Touching only the first instance silently dropped lines such as
+      // `MYCR_TailsClone.Mode = 0`, so the cut-scene clones stayed invisible,
+      // and `YCR_Ground.sprite_index = ...` (blood on a single tile).
+      if (rawTarget && typeof rawTarget === 'object' && rawTarget.__objDef) {
+        if (!MM.state) return;
+        var mlist = MM.state.instances;
+        for (var mi = 0; mi < mlist.length; mi++) {
+          var mo = mlist[mi];
+          if (mo._destroyed || mo._deactivated) continue;
+          if (mo.object_index !== rawTarget &&
+              !(MM.objectChainHas && MM.objectChainHas(mo.object_index, rawTarget))) continue;
+          setMemberValue(mo, node.name, value);
         }
-        obj[node.name] = mval;
+        return;
+      }
+      var obj = instTarget(rawTarget);
+      if (obj && typeof obj === 'object') {
+        setMemberValue(obj, node.name, value);
         return;
       }
       MM.warn('присвоение свойства у не-объекта: ' + node.name);

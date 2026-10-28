@@ -1786,7 +1786,7 @@
           'if (place_meeting(x, bbox_bottom + 1, Solid_Line) && (vspeed >= 0) && ' +
           '(((Glide == 0) && (Climb == 0) && (Climb2 == 0)) || !' + side22 + ')) // line grab fixed');
       }
-      s22 += '\n// line grab fixed\nif (Pers_Obj.Tornado_Mode == 0 && (place_meeting(bbox_right + 3, y, Solid_Line) || place_meeting(bbox_left - 3, y, Solid_Line))) { if (Glide == 1) { audio_play_sound(SFX_Grab, 0, false); Climb = 1; Glide = 0; } spindash = 0; canJump = 0; Act = 0; Hang = 0; Grav = 1; drawAngle = 0; rolling = 0; global.vel = 0; }';
+      s22 += '\n// line grab fixed\nif ((Glide == 1) && (Pers_Obj.Tornado_Mode == 0) && (place_meeting(bbox_right + 3, y, Solid_Line) || place_meeting(bbox_left - 3, y, Solid_Line))) { audio_play_sound(SFX_Grab, 0, false); Climb = 1; Glide = 0; spindash = 0; canJump = 0; Act = 0; Hang = 0; Grav = 1; drawAngle = 0; rolling = 0; global.vel = 0; }';
       b[k22] = s22;
     }
     // Climb motion must recognise Solid_Line walls too (otherwise x++ pushes
@@ -1819,28 +1819,38 @@
       // walking into a wall (e.g. the Scrap Brain steel walls) just pushed the
       // hero into the wall.  Start the same climb state when pushing toward a
       // wall on the ground, but only if the wall continues above the head.
+      // Wall sticking belongs to gliding only: the original latches Knuckles
+      // onto a wall when he glides into it.  An earlier patch also attached him
+      // while merely walking/jumping next to a wall, which turned every jump
+      // into a Spider-Man wall climb.  Keep the attachment glide-only.
       var tailAnchor = '    if ((Tornado_Mode == 1) && (ground == 1) && keyboard_check_pressed(ord("Z")) && (HUDer.HUD_Mode == 1))\n' +
                        '    {\n        vspeed = -6;\n    }\n}';
-      if (out.indexOf('// ground climb fix') < 0 && out.indexOf(tailAnchor) >= 0) {
-        var climb =
-          '    if ((Tornado_Mode == 1) && (ground == 1) && keyboard_check_pressed(ord("Z")) && (HUDer.HUD_Mode == 1))\n' +
-          '    {\n        vspeed = -6;\n    }\n' +
-          '    // ground climb fix\n' +
-          '    if ((Climb == 1) && (ground == 1) && keyboard_check(vk_down) && !keyboard_check(vk_up))\n' +
-          '    {\n        Climb = 0;\n    }\n' +
-          '    if ((Climb == 0) && (Climb2 == 0) && (Glide == 0) && (ground == 1) && (Tornado_Mode == 0) && (Wait_mode == 0) && (Punch == 0))\n' +
+      if (out.indexOf('// ground climb fix') >= 0) {
+        // Remove the automatic ground climb contributed by an older patch.
+        out = out.replace(/\n    \/\/ ground climb fix[\s\S]*?\n    \}\n(?=\})/, '\n');
+      }
+      // The engine keeps the body outside solid walls (the generic overlap
+      // resolver pushes it back), so a gliding Knuckles can end up flush
+      // against a wall without ever overlapping it -- and the GML collision
+      // grab then never fires.  Attach while gliding when a wall is within a
+      // few pixels of the body.  Sticking stays glide-only: walking or jumping
+      // next to a wall must not start a climb.
+      if (out.indexOf('// glide grab fix') < 0 && out.indexOf(tailAnchor) >= 0) {
+        var grab =
+          '    // glide grab fix\n' +
+          '    if ((Glide == 1) && (Climb == 0) && (Climb2 == 0) && (ground == 0) && (Tornado_Mode == 0))\n' +
           '    {\n' +
-          '        if (keyboard_check(vk_right) &&\n' +
-          '            (place_meeting(bbox_right + 2, y, Solid_Mask) || place_meeting(bbox_right + 2, y, Break_Mask) || place_meeting(bbox_right + 2, y, Solid_Line)) &&\n' +
-          '            (place_meeting(bbox_right + 2, y - 28, Solid_Mask) || place_meeting(bbox_right + 2, y - 28, Break_Mask) || place_meeting(bbox_right + 2, y - 28, Solid_Line)))\n' +
-          '        {\n            Climb = 1;\n            global.vel = 0;\n        }\n' +
-          '        if (keyboard_check(vk_left) &&\n' +
-          '            (place_meeting(bbox_left - 2, y, Solid_Mask) || place_meeting(bbox_left - 2, y, Break_Mask) || place_meeting(bbox_left - 2, y, Solid_Line)) &&\n' +
-          '            (place_meeting(bbox_left - 2, y - 28, Solid_Mask) || place_meeting(bbox_left - 2, y - 28, Break_Mask) || place_meeting(bbox_left - 2, y - 28, Solid_Line)))\n' +
-          '        {\n            Climb = 1;\n            global.vel = 0;\n        }\n' +
+          '        if (((image_xscale == 1) && (place_meeting(bbox_right + 4, y, Solid_Mask) || place_meeting(bbox_right + 4, y, Break_Mask) || place_meeting(bbox_right + 4, y, Solid_Line))) ||\n' +
+          '            ((image_xscale == -1) && (place_meeting(bbox_left - 4, y, Solid_Mask) || place_meeting(bbox_left - 4, y, Break_Mask) || place_meeting(bbox_left - 4, y, Solid_Line))))\n' +
+          '        {\n' +
+          '            audio_play_sound(SFX_Grab, 0, false);\n' +
+          '            Climb = 1;\n' +
+          '            Glide = 0;\n' +
+          '            global.vel = 0;\n' +
+          '        }\n' +
           '    }\n' +
           '}';
-        out = out.replace(tailAnchor, climb);
+        out = out.replace(tailAnchor, grab);
       }
       // While hanging on a wall the hero must not keep the horizontal speed he
       // had when the glide ended: with right held the old code added `x++` plus
