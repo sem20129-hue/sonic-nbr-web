@@ -9,7 +9,7 @@
 // Build sync: ask the server for the current stamp without blocking the page
 // (a synchronous request could hang the loader on a slow CDN).
 (function () {
-  var cur = '20261028173351';
+  var cur = '20261028180731';
   if (!cur || cur.charAt(0) === '_') return;
   try {
     var ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
@@ -180,7 +180,7 @@
 <div id="boot"><div class="t">ЗАГРУЗКА ИГРЫ</div><div class="bar"><i></i></div><div class="n">0 / 0</div></div>
 <div id="wrap">
   <div id="stage">
-    <canvas id="game" width="854" height="480" tabindex="0"></canvas>
+    <canvas id="game" width="320" height="260" tabindex="0"></canvas>
     <div id="hud"></div>
     <div id="overlay">
       <div class="card">
@@ -244,25 +244,25 @@
 </script>
 
 <!-- runtime -->
-<script src="runtime/mm_core.js?v=20261028173351"></script>
-<script src="runtime/mm_interp.js?v=20261028173351"></script>
-<script src="runtime/mm_builtins.js?v=20261028173351"></script>
-<script src="runtime/mm_audio.js?v=20261028173351"></script>
-<script src="runtime/mm_nbr.js?v=20261028173351"></script>
-<script src="runtime/mm_fanending.js?v=20261028173351"></script>
-<script src="runtime/mm_bot.js?v=20261028173351"></script>
+<script src="runtime/mm_core.js?v=20261028180731"></script>
+<script src="runtime/mm_interp.js?v=20261028180731"></script>
+<script src="runtime/mm_builtins.js?v=20261028180731"></script>
+<script src="runtime/mm_audio.js?v=20261028180731"></script>
+<script src="runtime/mm_nbr.js?v=20261028180731"></script>
+<script src="runtime/mm_fanending.js?v=20261028180731"></script>
+<script src="runtime/mm_bot.js?v=20261028180731"></script>
 
 <!-- generated game package -->
-<script src="game/code.js?v=20261028173351"></script>
-<script src="game/sprites.js?v=20261028173351"></script>
-<script src="game/objects.js?v=20261028173351"></script>
-<script src="game/asset_ids.js?v=20261028173351"></script>
-<script src="game/rooms.js?v=20261028173351"></script>
-<script src="game/scripts.js?v=20261028173351"></script>
-<script src="game/sounds.js?v=20261028173351"></script>
-<script src="game/fonts.js?v=20261028173351"></script>
-<script src="game/assets.js?v=20261028173351"></script>
-<script src="game/tiles.js?v=20261028173351"></script>
+<script src="game/code.js?v=20261028180731"></script>
+<script src="game/sprites.js?v=20261028180731"></script>
+<script src="game/objects.js?v=20261028180731"></script>
+<script src="game/asset_ids.js?v=20261028180731"></script>
+<script src="game/rooms.js?v=20261028180731"></script>
+<script src="game/scripts.js?v=20261028180731"></script>
+<script src="game/sounds.js?v=20261028180731"></script>
+<script src="game/fonts.js?v=20261028180731"></script>
+<script src="game/assets.js?v=20261028180731"></script>
+<script src="game/tiles.js?v=20261028180731"></script>
 
 <script>
 (function () {
@@ -293,9 +293,14 @@
     var availH = full ? window.innerHeight : window.innerHeight - barH - 68;
     if (availW < 80) availW = 80;
     if (availH < 60) availH = 60;
-    var baseW = canvas.width || 640, baseH = canvas.height || 480;
+    var baseW = canvas.width || 320, baseH = canvas.height || 260;
     var raw = Math.min(availW / baseW, availH / baseH);
+    // Integer upscale: a fractional factor (1.9x, 2.4x...) turns every art
+    // pixel into 1 or 2 screen pixels depending on its position, which is what
+    // made backgrounds drift apart and fine patterns shimmer on big screens.
     var scale = raw;
+    if (raw >= 2) scale = Math.floor(raw + 1e-6);
+    if (scale < 0.25) scale = 0.25;
     var w = Math.max(1, Math.floor(baseW * scale));
     var h = Math.max(1, Math.floor(baseH * scale));
     canvas.style.width = w + 'px';
@@ -380,7 +385,10 @@
                     ' · звуков: ' + (summary.sounds || 0) +
                     ' · скриптов: ' + (summary.scripts || 0);
 
-  MM.nbrBoot({ canvas: canvas, room: 'LanguageSelect_19', width: 854, height: 480, fps: 60 });
+  // The canvas is now the authored view resolution (320x260 in gameplay,
+  // 640x480 in menu rooms); re-fit the page whenever a room changes it.
+  MM.onCanvasResize = fit;
+  MM.nbrBoot({ canvas: canvas, room: 'LanguageSelect_19', width: 320, height: 260, fps: 60 });
   // The decompiled game toggles fullscreen with its own `S` key
   // (window_set_fullscreen).  Some browsers reject that API; route the failure
   // to the CSS full-window layout so the result is the same either way.

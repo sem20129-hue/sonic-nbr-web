@@ -1501,8 +1501,39 @@
     MM.roomGoto(MM.state.bootRoom, true);
   };
 
-  MM.applyRoomView = function (room) {
-    var i;
+  // Render at the authored view resolution and let the page upscale the canvas
+  // by an integer factor.  Keeping the canvas at 854x480 meant the 320x260
+  // view was scaled by 1.846 inside the canvas: every art pixel became 1 or 2
+  // screen pixels depending on where it sat, so backgrounds "went apart" and
+  // fine patterns shimmered on large screens.  1:1 at 320x260 (or 640x480 for
+  // the menu rooms) with an integer CSS scale is uniform and much cheaper.
+  MM.syncCanvasSize = function () {
+    var cv = MM.canvas;
+    if (!cv || !cv.getContext) return;
+    var vw = Math.max(1, Math.round(MM.view.wview[0] || MM.VIEW_W));
+    var vh = Math.max(1, Math.round(MM.view.hview[0] || MM.VIEW_H));
+    if (cv.width === vw && cv.height === vh && MM.VIEW_W === vw && MM.VIEW_H === vh) return;
+    cv.width = vw;
+    cv.height = vh;
+    MM.VIEW_W = vw;
+    MM.VIEW_H = vh;
+    // The window (port) is the view itself now: draw the authored view 1:1
+    // instead of fitting a 640x480 port into it (which letterboxed 10 px and
+    // reintroduced fractional scaling).
+    for (var i = 0; i < 8; i++) {
+      MM.view.portX[i] = 0;
+      MM.view.portY[i] = 0;
+      MM.view.portW[i] = vw;
+      MM.view.portH[i] = vh;
+    }
+    try {
+      MM.ctx = cv.getContext('2d');
+      if (MM.ctx) MM.ctx.imageSmoothingEnabled = false;
+    } catch (e) { /* ignore */ }
+    if (MM.onCanvasResize) { try { MM.onCanvasResize(vw, vh); } catch (e) { /* ignore */ } }
+  };
+
+  MM.applyRoomView = function (room) {    var i;
     for (i = 0; i < 8; i++) {
       MM.view.visible[i] = false;
       MM.view.object[i] = null;
@@ -1676,6 +1707,7 @@
     MM.state.loadingRoom = true;
     MM.resetTileLayers(room);
     MM.applyRoomView(room);
+    MM.syncCanvasSize();
     MM.view.xview[0] = MM.view.xview[0] || 0;
     MM.view.yview[0] = MM.view.yview[0] || 0;
 
