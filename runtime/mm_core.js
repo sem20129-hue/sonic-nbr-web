@@ -665,8 +665,7 @@
     } else {
       if (x === undefined) x = inst.x;
       if (y === undefined) y = inst.y;
-    }
-    // GML: the collision mask is mask_index when it points at a sprite; the
+    }    // GML: the collision mask is mask_index when it points at a sprite; the
     // game switches it per state (Knuckles stand/duck/punch, ground blocks
     // solid vs one-way "unsolid" strips).  Ignoring it made every block a full
     // 256x256 wall and every character wedged and unable to move.
@@ -686,12 +685,22 @@
       if (own) inst._bboxCache = { x: inst.x, y: inst.y, sx: inst.image_xscale, sy: inst.image_yscale, spr: inst.sprite_index, msk: inst.mask_index, box: null };
       return null;
     }
-    var out = {
+    var out;
+    if (own) {
+      out = inst._bboxBox || (inst._bboxBox = { l: 0, r: 0, t: 0, b: 0 });
+      out.l = Math.floor(x + box.l); out.r = Math.floor(x + box.r);
+      out.t = Math.floor(y + box.t); out.b = Math.floor(y + box.b);
+      var bc2 = inst._bboxCache;
+      if (!bc2) bc2 = inst._bboxCache = { box: out };
+      bc2.x = inst.x; bc2.y = inst.y;
+      bc2.sx = inst.image_xscale; bc2.sy = inst.image_yscale;
+      bc2.spr = inst.sprite_index; bc2.msk = inst.mask_index;
+      return out;
+    }
+    return {
       l: Math.floor(x + box.l), r: Math.floor(x + box.r),
       t: Math.floor(y + box.t), b: Math.floor(y + box.b)
     };
-    if (own) inst._bboxCache = { x: inst.x, y: inst.y, sx: inst.image_xscale, sy: inst.image_yscale, spr: inst.sprite_index, msk: inst.mask_index, box: out };
-    return out;
   };
 
   // GML bounding boxes are inclusive pixel ranges: two masks that share an
@@ -784,7 +793,9 @@
     var rec = _xIndex[def.name];
     // `speed` / `direction` are prototype getters (sqrt + atan2); both are
     // derived from hspeed / vspeed, so testing those two is equivalent.
-    if (rec && rec.frame === st.frame && rec.version === st.version) return rec;
+    // Static geometry never moves, so the buckets only need rebuilding when
+    // the instance set changes (version), not on every frame.
+    if (rec && rec.version === st.version) return rec;
     var entries = [];
     var dyn = [];
     var w = 0;
@@ -929,9 +940,12 @@
   // hanging in mid-air forever.  Revert the offending axis instead.
   // -------------------------------------------------------------------
   function isPlayerInst(inst) {
+    var cached = inst._playerCache;
+    if (cached !== undefined) return cached;
     var def = inst.object_index;
     if (!def) return false;
     if (def._isPlayer === undefined) def._isPlayer = MM.objectChainHas(def, MM.objects['Pers_Obj']);
+    inst._playerCache = def._isPlayer;
     return def._isPlayer;
   }
 
@@ -1437,6 +1451,9 @@
     tickAlarms(alarmInstanceList());
     var sl = eventInstanceList('step').slice();
     for (i = 0; i < sl.length; i++) if (!sl[i]._destroyed) MM.runEvent(sl[i], 'step');
+    // Native-JS fast path for events that are just a handful of numeric
+    // checks (thousands of wall pieces) instead of interpreted GML.
+    if (MM.extraStep) MM.extraStep();
     tickPhysics();
     tickPaths();
     tickOutsideRoom();

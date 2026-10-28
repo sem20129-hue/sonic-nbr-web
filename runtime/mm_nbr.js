@@ -2152,6 +2152,42 @@
       if (!def || !def.events || typeof def.events.step !== 'string') continue;
       def._wallStepCode = def.events.step;
     }
+    // The Green Hill wall step is nothing but a few numeric range checks (and
+    // a GHZ_Checker6 probe), yet 740+ wall pieces ran it through the GML
+    // interpreter every frame -- about 6 ms of the step budget in GHZ_7.  Do
+    // the same work in native JS once per step instead.
+    MM.extraStep = function () {
+      var room = MM.state.room;
+      if (!room || room.name !== 'GHZ_7') return;
+      var list = MM.state.instances;
+      var checkers = MM.query('GHZ_Checker6');
+      for (var i = 0; i < list.length; i++) {
+        var o = list[i];
+        if (o._destroyed) continue;
+        var nm = o.object_name;
+        if (nm !== 'Solid_Line' && nm !== 'VerticalSolid_Line') continue;
+        var x = o.x, y = o.y;
+        if (nm === 'Solid_Line') {
+          if (checkers.length) {
+            for (var c = 0; c < checkers.length; c++) {
+              var cb = MM.bbox(checkers[c]);
+              if (cb && cb.l <= x + 100 && cb.r >= x - 100 && cb.t <= y && cb.b >= y) {
+                MM.instanceDestroy(o);
+                break;
+              }
+            }
+            if (o._destroyed) continue;
+          }
+          if ((x > 4400 && x < 4500) && (y > 1568 && y < 1661)) o.DeleteAct1 = 1;
+          if ((x > 5214 && x < 5306) && (y > 3010 && y < 3055)) o.DeleteAct1 = 2;
+        } else {
+          if ((x > 5278 && x < 5347) && (y > 2968 && y < 3013)) o.DeleteAct1 = 1;
+          if ((x > 6260 && x < 6507) && (y > 1825 && y < 1860)) o.DeleteAct1 = 2;
+        }
+        if (o.Active === 1 && o.DeleteAct1 === 1) MM.instanceDestroy(o);
+        else if (o.Active === 2 && o.DeleteAct1 === 2) MM.instanceDestroy(o);
+      }
+    };
     var applyWalls = function (room) {
       var name = room && room.name;
       var ghz = name === 'GHZ_7';
@@ -2160,7 +2196,9 @@
       for (var w = 0; w < walls.length; w++) {
         var d = MM.objects[walls[w]];
         if (!d || !d._wallStepCode) continue;
-        var need = (walls[w] === 'Solid_Line') ? (ghz || checker) : ghz;
+        // GHZ_7 is handled by MM.extraStep; other rooms only need Solid_Line
+        // when a GHZ_Checker6 actually exists there.
+        var need = (walls[w] === 'Solid_Line') ? (!ghz && checker) : false;
         d.events.step = need ? d._wallStepCode : '';
         d._eventCode = null;
       }
@@ -2182,10 +2220,12 @@
   function patchGroundSteps() {
     var b = MM.codeBundle;
     if (!b) return;
-    var key = 'gml_Object_AAZ_Ground_Step_0';
-    var s = b[key];
-    if (typeof s === 'string' && s.indexOf('// near player only') < 0) {
-      b[key] = 'if (instance_exists(Pers_Obj) && (abs(x - Pers_Obj.x) <= 480))\n{\n' + s + '\n}\n// near player only';
+    var keys = ['gml_Object_AAZ_Ground_Step_0', 'gml_Object_GHZ_Ground_Step_0'];
+    for (var i = 0; i < keys.length; i++) {
+      var s = b[keys[i]];
+      if (typeof s === 'string' && s.indexOf('// near player only') < 0) {
+        b[keys[i]] = 'if (instance_exists(Pers_Obj) && (abs(x - Pers_Obj.x) <= 480))\n{\n' + s + '\n}\n// near player only';
+      }
     }
   }
 

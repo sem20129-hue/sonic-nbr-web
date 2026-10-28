@@ -549,8 +549,17 @@
       case 'noone': return MM.NOONE;
     }
     if (ctx.scope) {
-      var sv = ctx.scope.read(name);
-      if (sv !== NOT_FOUND) return sv;
+      // Inline the scope walk: this runs for almost every identifier in every
+      // event, and the extra method call was one of the hottest functions.
+      var sc = ctx.scope;
+      var sv = sc.vars[name];
+      if (sv !== undefined || (name in sc.vars)) return sv;
+      var sp = sc.parent;
+      while (sp) {
+        sv = sp.vars[name];
+        if (sv !== undefined || (name in sp.vars)) return sv;
+        sp = sp.parent;
+      }
     }
     // bbox_* is read constantly by ground / wall probes; going through the
     // builtin getter table costs a dispatch per read.
