@@ -2247,6 +2247,7 @@
         window.addEventListener('focus', wake);
       }
       var lastLoop = 0;
+      var lastRaf = 0;
       var nowMs = function () {
         return (typeof performance !== 'undefined' ? performance.now() : Date.now());
       };
@@ -2299,26 +2300,28 @@
         MM.renderFrame();
       };
       var loop = function (t) {
+        lastRaf = t;
         try { drive(t); } catch (e) { if (!MM._loopErr) MM._loopErr = String(e && e.message); }
         requestAnimationFrame(loop);
       };
       requestAnimationFrame(loop);
-      // Watchdog: some embedded browsers/webviews throttle or stop rAF even
-      // while the page is visible; without it the game looked frozen after the
-      // loading screen disappeared.  It must stay a rare fallback: running the
-      // normal loop from a timer while the real browser frame is merely slow
-      // doubled the work per frame and could lock the page up.
+      // Watchdog: some browsers/webviews throttle or stop rAF while the window
+      // is merely unfocused or partly occluded.  Without this the game dropped
+      // to a couple of frames per second (reported as "3 FPS").  While the page
+      // is visible, drive the same loop from a 60 Hz timer as soon as rAF has
+      // been silent for 120 ms.  A live rAF (even a slow one) keeps the timer
+      // idle, so this never doubles the work in normal play.
       if (typeof setInterval === 'function') {
         var lastWatch = 0;
         setInterval(function () {
           if (!MM.state.running) return;
           if (typeof document !== 'undefined' && document.hidden) return;
           var now = nowMs();
-          if (now - lastLoop <= 800) return;
-          if (now - lastWatch < 700) return;
+          if (now - lastRaf <= 120) return;
+          if (now - lastWatch < 14) return;
           lastWatch = now;
           try { drive(now); } catch (e) { if (!MM._loopErr) MM._loopErr = String(e && e.message); }
-        }, 100);
+        }, 16);
       }
     }
     return MM;
