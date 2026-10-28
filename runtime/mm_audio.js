@@ -612,7 +612,7 @@
           rememberDecoded(url, buf);
           fileLoading[url] = false;
           flushPending(url);
-          if (fileMusic.src === url && fileMusic.name && !fileMusic.node) startFileMusic();
+          if (fileMusic.src === url && fileMusic.name && !fileMusic.node) handOffMusic(url);
         })
         .catch(function (e) {
           fileLoading[url] = false;
@@ -772,10 +772,22 @@
 
   function htmlMusicPlay() {
     if (!htmlMusic) return;
+    var el = htmlMusic;
     try {
-      var p = htmlMusic.play();
-      if (p && typeof p.catch === 'function') p.catch(function () {});
-    } catch (e) {}
+      var p = el.play();
+      if (p && typeof p.catch === 'function') p.catch(function () {
+        // Autoplay refused: release the element, otherwise startFileMusic()
+        // would keep thinking the element owns playback and the track would
+        // stay silent even after the Web Audio buffer is ready.
+        if (htmlMusic === el) {
+          htmlMusic = null;
+          htmlMusicName = null;
+          if (fileMusic.src && fileBuffers[fileMusic.src]) startFileMusic();
+        }
+      });
+    } catch (e) {
+      if (htmlMusic === el) { htmlMusic = null; htmlMusicName = null; }
+    }
   }
 
   function htmlMusicStop() {
@@ -906,6 +918,21 @@
     } catch (e) { return false; }
   }
 
+  // When the buffered (Web Audio) version of the track becomes available after
+  // the <audio> element already started it, hand playback over at the same
+  // position: element playback ignores volume ramps, the node does not.
+  function handOffMusic(url) {
+    if (!(fileMusic.src === url) || !fileMusic.name) return;
+    if (fileMusic.node) return;
+    if (htmlMusic) {
+      var t = 0;
+      try { t = htmlMusic.currentTime || 0; } catch (e) { t = 0; }
+      fileMusic.offset = t;
+      htmlMusicStop();
+    }
+    startFileMusic();
+  }
+
   function playMusicFile(name, src, opts) {
     opts = opts || {};
     if (fileMusic.name === name && fileMusic.node) return true;
@@ -923,7 +950,15 @@
     if (!isReady()) init();          // allowed: the context starts suspended
     resumeCtx();
     if (!isReady()) return false;    // truly headless (no AudioContext)
-    if (!fileBuffers[src]) { loadFileBuffer(src); return false; }
+    if (!fileBuffers[src]) {
+      loadFileBuffer(src);
+      // Decoding a multi-minute OGG takes seconds on the first visit, and the
+      // track then started only after the black transition.  Start it through
+      // an <audio> element immediately; handOffMusic() switches to the decoded
+      // buffer at the same position once it is ready (volume ramps etc.).
+      try { musicElement(); } catch (e) { /* ignore */ }
+      return false;
+    }
     return startFileMusic();
   }
 

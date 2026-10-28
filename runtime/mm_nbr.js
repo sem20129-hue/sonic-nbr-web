@@ -2076,6 +2076,23 @@
     b[key] = stop + s;
   }
 
+  // Shield bounce: the projectile is replaced by "LaserBallOut", whose Step
+  // sets `x = MetalShield1.x` -- an instant horizontal jump of up to half the
+  // 50-px shield, which read as the ball teleporting on impact.  Keep the
+  // impact point and let it slide onto the shield instead.
+  function patchShieldBall() {
+    var b = MM.codeBundle;
+    if (!b) return;
+    var key = 'gml_Object_EggB2_LaserBallOut_Step_0';
+    var s = b[key];
+    if (typeof s !== 'string' || s.indexOf('// slide onto shield') >= 0) return;
+    if (s.indexOf('    x = MetalShield1.x;') < 0) return;
+    b[key] = s.replace('    x = MetalShield1.x;',
+      '    // slide onto shield\n' +
+      '    if (abs(MetalShield1.x - x) <= 4) { x = MetalShield1.x; }\n' +
+      '    else { x += sign(MetalShield1.x - x) * 4; }');
+  }
+
   MM.nbrBoot = function (opts) {
     patchSpringContacts();
     patchBirdFacing();
@@ -2087,6 +2104,7 @@
     patchCutsceneWalls();
     patchCutsceneWallHit();
     patchBloodyScrapBrain();
+    patchShieldBall();
     patchWideUI();
     opts = opts || {};
     MM.VIEW_W = opts.width || 640;
