@@ -266,7 +266,12 @@
       if (!S.vtiled[i]) { row0 = 0; row1 = 0; }
       for (var c = col0; c <= col1; c++) {
         for (var r = row0; r <= row1; r++) {
-          ctx.drawImage(drawn, Math.round(baseX + c * iw), Math.round(baseY + r * ih));
+          // The world is drawn with a non-integer scale (480/260 = 1.846), so
+          // two tiles that are exactly adjacent in view pixels can still leave
+          // a one-device-pixel dark seam where their edges round apart.  Draw
+          // each tile one pixel larger to overlap the neighbour and hide it.
+          ctx.drawImage(drawn, Math.round(baseX + c * iw), Math.round(baseY + r * ih),
+            iw + 1, ih + 1);
         }
       }
       ctx.globalAlpha = prevA;
@@ -588,6 +593,37 @@
   MM.fontImage = function (f) {
     if (!f) return null;
     if (f.img) return f.img;
+    // Sprite font (font_add_sprite): every frame of the sprite is one glyph.
+    // Compose the frames into one atlas once the sprite images are ready; the
+    // old code never produced an image, so the HUD numbers fell back to the
+    // canvas font and looked like garbage.
+    if (f.meta && f.meta.sprite) {
+      var spr = f.meta.sprite;
+      var frames = [], tw = 0, th = 0;
+      for (var i = 0; i < f.list.length; i++) {
+        var cv = MM.spriteCanvas ? MM.spriteCanvas(spr, f.list[i].frame) : null;
+        if (!cv || !cv.width) return null;   // not loaded yet: retry next frame
+        frames.push(cv);
+        tw += cv.width + 1;
+        if (cv.height > th) th = cv.height;
+      }
+      if (!frames.length) return null;
+      var at = document.createElement('canvas');
+      at.width = Math.max(1, tw);
+      at.height = Math.max(1, th);
+      var c2 = at.getContext('2d');
+      var x = 0;
+      for (var j = 0; j < frames.length; j++) {
+        c2.drawImage(frames[j], x, 0);
+        f.list[j].x = x;
+        f.list[j].y = 0;
+        f.list[j].w = frames[j].width;
+        f.list[j].h = frames[j].height;
+        x += frames[j].width + 1;
+      }
+      f.img = at;
+      return at;
+    }
     if (!hasImage) return null;
     if (!f._tried) {
       f._tried = true;
@@ -1214,16 +1250,24 @@
   };
 
   B.font_add_sprite = function (ctx, args) {
-    // Approximation: every frame of the sprite becomes one glyph.
+    // GM signature: font_add_sprite(sprite, first, prop, sep).  Each frame of
+    // the sprite is the glyph for character (first + frame index).
     var spr = args[0];
     if (!spr) return -1;
-    var first = num(args[1], 32), sep = num(args[3], 0);
+    var first = num(args[1], 32);
+    var prop = num(args[2], 0);
+    var sep = num(args[3], 0);
     var glyphs = [];
     for (var i = 0; i < spr.frames.length; i++) {
-      glyphs.push({ ch: String.fromCharCode(first + i), x: 0, y: 0, w: spr.w, h: spr.h, shift: spr.w + sep, offset: 0 });
+      glyphs.push({
+        ch: String.fromCharCode(first + i),
+        frame: i, x: 0, y: 0, w: spr.w, h: spr.h,
+        shift: prop ? spr.w : (spr.w + sep),
+        offset: 0
+      });
     }
     var name = 'font_' + spr.name;
-    MM.defineFont(name, null, glyphs, { lineHeight: spr.h, emSize: spr.h });
+    MM.defineFont(name, null, glyphs, { lineHeight: spr.h, emSize: spr.h, sprite: spr });
     return name;
   };
 
@@ -2093,6 +2137,58 @@
       '    else { x += sign(MetalShield1.x - x) * 4; }');
   }
 
+  // Solid_Line / VerticalSolid_Line are the tiny collision strips that build
+  // every wall; one stage easily holds 500+ of them.  Their Step events only do
+  // work in Green Hill (a GHZ_Checker6 probe and the room==GHZ_7 deletion
+  // zones), yet the interpreter ran them all, every step, in every room --
+  // roughly 25 ms of the frame budget in Angel Island.  Detach the event in
+  // rooms where it can never do anything and restore it where it matters.
+  function patchStaticWallSteps() {
+    var b = MM.codeBundle;
+    if (!b) return;
+    var walls = ['Solid_Line', 'VerticalSolid_Line'];
+    for (var i = 0; i < walls.length; i++) {
+      var def = MM.objects[walls[i]];
+      if (!def || !def.events || typeof def.events.step !== 'string') continue;
+      def._wallStepCode = def.events.step;
+    }
+    var applyWalls = function (room) {
+      var name = room && room.name;
+      var ghz = name === 'GHZ_7';
+      var checker = false;
+      try { checker = MM.query && MM.query('GHZ_Checker6').length > 0; } catch (e) { checker = false; }
+      for (var w = 0; w < walls.length; w++) {
+        var d = MM.objects[walls[w]];
+        if (!d || !d._wallStepCode) continue;
+        var need = (walls[w] === 'Solid_Line') ? (ghz || checker) : ghz;
+        d.events.step = need ? d._wallStepCode : '';
+        d._eventCode = null;
+      }
+      if (MM.state) MM.state.version++;
+    };
+    var prevLoaded = MM.onRoomLoaded;
+    MM.onRoomLoaded = function (room) {
+      applyWalls(room);
+      if (prevLoaded) prevLoaded(room);
+    };
+  }
+
+  // AAZ_Ground's Step is a long block of collision probes (crush check, one-way
+  // mask selection against YCR_Out_* zones, a push-out against the player).  It
+  // ran for every single ground block in the stage -- 161 of them in Angel
+  // Island, ~24 ms per step, by far the most expensive event in the game.  All
+  // of those probes involve the player, so blocks far outside the view cannot
+  // change anything yet: update them only near the player.
+  function patchGroundSteps() {
+    var b = MM.codeBundle;
+    if (!b) return;
+    var key = 'gml_Object_AAZ_Ground_Step_0';
+    var s = b[key];
+    if (typeof s === 'string' && s.indexOf('// near player only') < 0) {
+      b[key] = 'if (instance_exists(Pers_Obj) && (abs(x - Pers_Obj.x) <= 480))\n{\n' + s + '\n}\n// near player only';
+    }
+  }
+
   MM.nbrBoot = function (opts) {
     patchSpringContacts();
     patchBirdFacing();
@@ -2105,6 +2201,8 @@
     patchCutsceneWallHit();
     patchBloodyScrapBrain();
     patchShieldBall();
+    patchStaticWallSteps();
+    patchGroundSteps();
     patchWideUI();
     opts = opts || {};
     MM.VIEW_W = opts.width || 640;

@@ -1587,7 +1587,9 @@
     var img = MM.bgImage(t.i);
     if (!img || !img.width) return;
     var k = t.k == null ? 1 : t.k, l = t.l == null ? 1 : t.l;
-    ctx.drawImage(img, t.sx, t.sy, t.w, t.h, t.x, t.y, t.w * k, t.h * l);
+    // One pixel of overlap hides the hairline seams that the non-integer
+    // (480/260) world scale leaves between adjacent tiles.
+    ctx.drawImage(img, t.sx, t.sy, t.w, t.h, t.x, t.y, t.w * k + 1, t.h * l + 1);
   }
 
   // Tile layers can be hidden/shown per depth (tile_layer_hide/show).  GHZ_7
@@ -1750,10 +1752,13 @@
     var l = Math.round(x), t = Math.round(y);
     ctx.drawImage(cv, 0, 0, leftW, H, l, t, leftW, H);
     if (srcMid > 0) {
-      ctx.drawImage(cv, leftW, 0, srcMid, H, l + leftW, t, midW, H);
+      // Overlap the slices by a pixel: the 1.846 world scale can open a
+      // hairline gap at the junction, which showed as a dark vertical seam.
+      ctx.drawImage(cv, leftW, 0, srcMid, H, l + leftW - 1, t, midW + 2, H);
     }
     if (rightW > 0) {
-      ctx.drawImage(cv, cv.width - rightW, 0, rightW, H, l + leftW + midW, t, rightW, H);
+      ctx.drawImage(cv, cv.width - rightW, 0, rightW, H,
+        l + leftW + midW - 1, t, rightW + 1, H);
     }
   }
 
