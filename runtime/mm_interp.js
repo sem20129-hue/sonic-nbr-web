@@ -515,11 +515,15 @@
     if (hit !== undefined) return hit || v;
     var list = MM.state.instances;
     var child = null;
+    var idSet = MM.objectIdSet ? MM.objectIdSet(v) : null;
     for (var i = 0; i < list.length; i++) {
       var o = list[i];
       if (o._destroyed || o._deactivated) continue;
       if (o.object_index === v) { _itCache[key] = o; return o; }
-      if (!child && MM.objectChainHas && MM.objectChainHas(o.object_index, v)) child = o;
+      if (!child) {
+        if (idSet) { if (idSet.has(o.object_index)) child = o; }
+        else if (MM.objectChainHas && MM.objectChainHas(o.object_index, v)) child = o;
+      }
     }
     if (child) { _itCache[key] = child; return child; }
     _itCache[key] = null;
@@ -748,12 +752,15 @@
       // and `YCR_Ground.sprite_index = ...` (blood on a single tile).
       if (rawTarget && typeof rawTarget === 'object' && rawTarget.__objDef) {
         if (!MM.state) return;
+        var idSet = MM.objectIdSet ? MM.objectIdSet(rawTarget) : null;
         var mlist = MM.state.instances;
         for (var mi = 0; mi < mlist.length; mi++) {
           var mo = mlist[mi];
           if (mo._destroyed || mo._deactivated) continue;
-          if (mo.object_index !== rawTarget &&
-              !(MM.objectChainHas && MM.objectChainHas(mo.object_index, rawTarget))) continue;
+          if (idSet) {
+            if (!idSet.has(mo.object_index)) continue;
+          } else if (mo.object_index !== rawTarget &&
+                     !(MM.objectChainHas && MM.objectChainHas(mo.object_index, rawTarget))) continue;
           setMemberValue(mo, node.name, value);
         }
         return;

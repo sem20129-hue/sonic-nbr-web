@@ -529,6 +529,25 @@
     return false;
   };
 
+  // Set of object definitions that count as `def` (itself plus its children).
+  // The interpreter's `Object.variable = value` write must visit every instance
+  // of the object, and doing a parent-chain walk per instance made a single
+  // assignment cost O(instances * depth) -- hundreds of such writes per step
+  // turned into ~150k chain calls and halved the frame rate.  Object
+  // definitions never change, so the set is built once.
+  MM.objectIdSet = function (def) {
+    if (!def) return null;
+    if (def.__idSet) return def.__idSet;
+    var set = new Set();
+    for (var k in MM.objects) {
+      var d = MM.objects[k];
+      if (!d) continue;
+      if (d === def || MM.objectChainHas(d, def)) set.add(d);
+    }
+    def.__idSet = set;
+    return set;
+  };
+
   MM.EMPTY_LIST = MM.EMPTY_LIST || [];
 
   function buildQueryCache() {
@@ -2235,15 +2254,20 @@
         var dt = t - last; last = t;
         if (!(dt > 0) || dt > 250) dt = stepMs;
         acc += dt;
+        // Keep the normal catch-up budget: limiting it too eagerly made the
+        // camera advance in uneven 1-2 step bursts, which read as the whole
+        // world juddering while gliding.  Only really slow machines (a step
+        // over 40 ms) get a smaller budget, and the hard cap of five steps
+        // plus the watchdog below still prevent the runaway freeze.
         var maxSteps = 5;
-        if (stepCost > 22) maxSteps = 2;
-        if (stepCost > 55) maxSteps = 1;
+        if (stepCost > 40) maxSteps = 3;
+        if (stepCost > 80) maxSteps = 2;
         var guard = 0;
         while (acc >= stepMs && guard++ < maxSteps) {
           var t0 = nowMs();
           MM.step();
           var d = nowMs() - t0;
-          stepCost = stepCost * 0.8 + d * 0.2;
+          stepCost = stepCost * 0.85 + d * 0.15;
           if (d > 250) {
             MM._slow = {
               room: MM.state.room && MM.state.room.name,
@@ -2260,7 +2284,7 @@
         }
         // Drop a backlog we cannot work off this frame instead of carrying it
         // forever (a slow device must not accumulate minutes of game time).
-        if (acc > stepMs * 3) acc = 0;
+        if (acc > stepMs * 8) acc = 0;
         MM.renderFrame();
       };
       var loop = function (t) {
