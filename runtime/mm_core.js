@@ -1835,6 +1835,12 @@
     // continues to the screen edge instead of stopping mid-screen.
     var spr = inst.sprite_index;
     if (!spr || !spr.frames) return;
+    // The edge-extension below exists only for the experimental 16:9 view,
+    // where 320-wide backdrop art ends inside the wider screen.  In the
+    // authored 4:3 view the art already covers the frame; running it there
+    // stretched a 4-pixel strip of a backdrop across hundreds of pixels --
+    // the vertical colour streaks ("white stripes") over Green Hill.
+    if (MM.aspect !== '16:9') return;
     // Gameplay: only real backdrop layers (they sit behind everything).  Menu /
     // title screens are a single composition, so any wide art there counts.
     if (inst.depth < 100 && !(MM.isStaticArtRoom && MM.isStaticArtRoom())) return;
