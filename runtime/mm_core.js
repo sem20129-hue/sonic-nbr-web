@@ -1512,20 +1512,22 @@
     if (!cv || !cv.getContext) return;
     var vw = Math.max(1, Math.round(MM.view.wview[0] || MM.VIEW_W));
     var vh = Math.max(1, Math.round(MM.view.hview[0] || MM.VIEW_H));
-    if (cv.width === vw && cv.height === vh && MM.VIEW_W === vw && MM.VIEW_H === vh) return;
-    cv.width = vw;
-    cv.height = vh;
-    MM.VIEW_W = vw;
-    MM.VIEW_H = vh;
     // The window (port) is the view itself now: draw the authored view 1:1
-    // instead of fitting a 640x480 port into it (which letterboxed 10 px and
-    // reintroduced fractional scaling).
+    // instead of fitting a 640x480 port into it (which letterboxed ~10 px and
+    // reintroduced fractional scaling).  This has to happen on EVERY room load,
+    // not only when the canvas size changes.
     for (var i = 0; i < 8; i++) {
       MM.view.portX[i] = 0;
       MM.view.portY[i] = 0;
       MM.view.portW[i] = vw;
       MM.view.portH[i] = vh;
     }
+    var changed = (cv.width !== vw || cv.height !== vh || MM.VIEW_W !== vw || MM.VIEW_H !== vh);
+    MM.VIEW_W = vw;
+    MM.VIEW_H = vh;
+    if (!changed) return;
+    cv.width = vw;
+    cv.height = vh;
     try {
       MM.ctx = cv.getContext('2d');
       if (MM.ctx) MM.ctx.imageSmoothingEnabled = false;
