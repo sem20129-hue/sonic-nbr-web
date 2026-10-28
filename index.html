@@ -9,7 +9,7 @@
 // Build sync: ask the server for the current stamp without blocking the page
 // (a synchronous request could hang the loader on a slow CDN).
 (function () {
-  var cur = '20261028140039';
+  var cur = '20261028141322';
   if (!cur || cur.charAt(0) === '_') return;
   try {
     var ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
@@ -244,25 +244,25 @@
 </script>
 
 <!-- runtime -->
-<script src="runtime/mm_core.js?v=20261028140039"></script>
-<script src="runtime/mm_interp.js?v=20261028140039"></script>
-<script src="runtime/mm_builtins.js?v=20261028140039"></script>
-<script src="runtime/mm_audio.js?v=20261028140039"></script>
-<script src="runtime/mm_nbr.js?v=20261028140039"></script>
-<script src="runtime/mm_fanending.js?v=20261028140039"></script>
-<script src="runtime/mm_bot.js?v=20261028140039"></script>
+<script src="runtime/mm_core.js?v=20261028141322"></script>
+<script src="runtime/mm_interp.js?v=20261028141322"></script>
+<script src="runtime/mm_builtins.js?v=20261028141322"></script>
+<script src="runtime/mm_audio.js?v=20261028141322"></script>
+<script src="runtime/mm_nbr.js?v=20261028141322"></script>
+<script src="runtime/mm_fanending.js?v=20261028141322"></script>
+<script src="runtime/mm_bot.js?v=20261028141322"></script>
 
 <!-- generated game package -->
-<script src="game/code.js?v=20261028140039"></script>
-<script src="game/sprites.js?v=20261028140039"></script>
-<script src="game/objects.js?v=20261028140039"></script>
-<script src="game/asset_ids.js?v=20261028140039"></script>
-<script src="game/rooms.js?v=20261028140039"></script>
-<script src="game/scripts.js?v=20261028140039"></script>
-<script src="game/sounds.js?v=20261028140039"></script>
-<script src="game/fonts.js?v=20261028140039"></script>
-<script src="game/assets.js?v=20261028140039"></script>
-<script src="game/tiles.js?v=20261028140039"></script>
+<script src="game/code.js?v=20261028141322"></script>
+<script src="game/sprites.js?v=20261028141322"></script>
+<script src="game/objects.js?v=20261028141322"></script>
+<script src="game/asset_ids.js?v=20261028141322"></script>
+<script src="game/rooms.js?v=20261028141322"></script>
+<script src="game/scripts.js?v=20261028141322"></script>
+<script src="game/sounds.js?v=20261028141322"></script>
+<script src="game/fonts.js?v=20261028141322"></script>
+<script src="game/assets.js?v=20261028141322"></script>
+<script src="game/tiles.js?v=20261028141322"></script>
 
 <script>
 (function () {
@@ -512,8 +512,15 @@
     }
   }, 1000);
 
+  var fpsLastT = 0, fpsLastF = 0, fpsValue = 0;
   setInterval(function () {
     if (!MM.state || !MM.state.room) return;
+    var nowT = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+    if (fpsLastT) {
+      var dtF = (nowT - fpsLastT) / 1000;
+      if (dtF > 0.1) fpsValue = Math.round((MM.state.frame - fpsLastF) / dtF);
+    }
+    fpsLastT = nowT; fpsLastF = MM.state.frame;
     var audio = '';
     if (MM.audio) {
       var st = MM.audio.debugState ? MM.audio.debugState() : null;
@@ -541,7 +548,7 @@
              ' · ' + MM._slow.ms + ' мс' + (MM._slow.page != null ? ' · диалог ' + MM._slow.page : '');
     }
     var focusHint = (document.hasFocus ? (document.hasFocus() ? '' : ' · кликни по игре') : '');
-    hud.textContent = MM.state.room.name + ' · ' + MM.state.frame + pos + audio + ' · ' + (MM.aspect === '4:3' ? '4:3' : '16:9') + ' · сборка ' + BUILD + focusHint + err + slow;
+    hud.textContent = MM.state.room.name + ' · ' + MM.state.frame + ' · ' + fpsValue + ' fps' + pos + audio + ' · ' + (MM.aspect === '4:3' ? '4:3' : '16:9') + ' · сборка ' + BUILD + focusHint + err + slow;
   }, 250);
 
   // --- audio unlock + start --------------------------------------------
@@ -549,7 +556,10 @@
     if (!ready) return;
     overlay.classList.add('hidden');
     if (MM.audio && MM.audio.unlock) MM.audio.unlock();
-    if (MM.audio && MM.audio.warmDecode) MM.audio.warmDecode();
+    // Do NOT warm-decode every effect here: on a slower device decoding the
+    // whole 47 MB effect bank in the background (one file every 40 ms) pins the
+    // main thread and drags the game down to a few FPS.  Sounds decode on first
+    // use instead (~50-150 ms once per sound).
     if (MM.state) MM.state.paused = false;
     canvas.focus();
     bootHide();

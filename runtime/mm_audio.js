@@ -1025,7 +1025,7 @@
       // After MM.preloadAll the bytes are already local: decoding here would
       // only burn memory up front.  Playback decodes on demand instead.
       if (f && f.src && !fileBytes[f.src]) loadFileBuffer(f.src);
-      setTimeout(pump, 140);
+      setTimeout(pump, 400);
     };
     setTimeout(pump, 500);
   }
