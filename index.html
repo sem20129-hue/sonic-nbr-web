@@ -9,7 +9,7 @@
 // Build sync: ask the server for the current stamp without blocking the page
 // (a synchronous request could hang the loader on a slow CDN).
 (function () {
-  var cur = '20261028213801';
+  var cur = '20261030164548';
   if (!cur || cur.charAt(0) === '_') return;
   try {
     var ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
@@ -125,16 +125,19 @@
     border-radius: 4px; padding: 4px 12px; cursor: pointer;
   }
   #fs:hover { color: #ffe27a; border-color: #55556a; }
-  #aspect, #bot-btn {
+  #aspect, #bot-btn, #cheat-btn {
     font: 12px Consolas, monospace;
     background: #101018; color: #9a9ab0;
     border: 1px solid #33334a; border-bottom-width: 2px;
     border-radius: 4px; padding: 4px 12px; cursor: pointer;
   }
-  #aspect:hover, #bot-btn:hover { color: #ffe27a; border-color: #55556a; }
+  #aspect:hover, #bot-btn:hover, #cheat-btn:hover { color: #ffe27a; border-color: #55556a; }
   #bot-btn { color: #b8f5b0; border-color: #2f5a34; }
   #bot-btn:hover { color: #e6ffe0; border-color: #4f8f57; }
-  body.fakefs #bar, body.fakefs #fs, body.fakefs #bot-btn, body.fakefs #botpanel { display: none; }
+  #cheat-btn { color: #ffe27a; border-color: #5a522f; }
+  #cheat-btn:hover { color: #fff3c4; border-color: #8f7f4f; }
+  body.fakefs #bar, body.fakefs #fs, body.fakefs #bot-btn, body.fakefs #botpanel,
+  body.fakefs #cheat-btn, body.fakefs #cheatpanel { display: none; }
 
   /* --- bot panel ------------------------------------------------------ */
   #botpanel {
@@ -174,6 +177,39 @@
   #botpanel.running #botstatus { color: #cfe9c9; }
   #botpanel .bp-note { margin-top: 6px; color: #55556a; font-size: 11px; line-height: 1.4; }
   body.fakefs #stage { box-shadow: none; }
+
+  /* --- cheat / endings panel ------------------------------------------ */
+  #cheatpanel {
+    display: none; position: fixed; right: 14px; bottom: 46px; z-index: 9999;
+    width: 300px; padding: 12px 12px 10px;
+    background: rgba(14,11,7,.96);
+    border: 1px solid #5a522f; border-radius: 6px;
+    box-shadow: 0 6px 24px rgba(0,0,0,.6);
+    font: 12px Consolas, monospace; color: #cdc6b0;
+  }
+  #cheatpanel.open { display: block; }
+  #cheatpanel .cp-title {
+    color: #ffe27a; letter-spacing: .06em; margin-bottom: 8px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  #cheatpanel .cp-close {
+    background: none; border: 0; color: #6d6d80; cursor: pointer;
+    font: 14px Consolas, monospace; padding: 0 2px;
+  }
+  #cheatpanel .cp-close:hover { color: #fff; }
+  #cheatpanel .cp-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+  #cheatpanel .cp-row button {
+    font: 12px Consolas, monospace; background: #1a1613; color: #e6d9b8;
+    border: 1px solid #5a522f; border-radius: 4px; padding: 5px 9px; cursor: pointer;
+  }
+  #cheatpanel .cp-row button:hover { background: #262016; border-color: #8f7f4f; color: #fff3c4; }
+  #cheatpanel .cp-row button.on { background: #2a2416; color: #ffe27a; border-color: #8f7f4f; }
+  #cheatpanel select {
+    width: 100%; font: 12px Consolas, monospace; background: #1a1613;
+    color: #e6d9b8; border: 1px solid #5a522f; border-radius: 4px; padding: 5px 6px;
+  }
+  #cheatstatus { min-height: 16px; color: #9a8f70; border-top: 1px solid #2c2620; padding-top: 6px; font-size: 11px; }
+  #cheatpanel .cp-note { margin-top: 6px; color: #6d6455; font-size: 11px; line-height: 1.4; }
 </style>
 </head>
 <body>
@@ -234,6 +270,19 @@
     <button id="fs" type="button">⛶ Полный экран (F) · двойной клик по игре</button>
     <button id="aspect" type="button">Формат: 16:9</button>
     <button id="bot-btn" type="button">🤖 Бот-демо</button>
+    <button id="cheat-btn" type="button">🔓 Читы</button>
+  </div>
+  <div id="cheatpanel">
+    <div class="cp-title"><span>ЧИТЫ · концовки</span><button class="cp-close" type="button" title="Закрыть">✕</button></div>
+    <div class="cp-row">
+      <button id="cheat-open" type="button">🔓 Открыть все маршруты</button>
+      <button id="cheat-done" type="button">✔ Всё пройдено</button>
+    </div>
+    <div class="cp-row"><select id="cheat-scene"></select></div>
+    <div class="cp-row"><button id="cheat-play" type="button">▶ Проиграть интерлюдию</button></div>
+    <div class="cp-row" id="cheat-rooms"></div>
+    <div id="cheatstatus">&nbsp;</div>
+    <div class="cp-note">Интерлюдии — сцены BTO_* (BlackRoom_4 с нужным transition). «Открыть маршруты» снимает блокировку повторного прохождения, «Всё пройдено» ставит отметки о концовках. Выбор хранится в браузере.</div>
   </div>
 </div>
 
@@ -244,25 +293,26 @@
 </script>
 
 <!-- runtime -->
-<script src="runtime/mm_core.js?v=20261028213801"></script>
-<script src="runtime/mm_interp.js?v=20261028213801"></script>
-<script src="runtime/mm_builtins.js?v=20261028213801"></script>
-<script src="runtime/mm_audio.js?v=20261028213801"></script>
-<script src="runtime/mm_nbr.js?v=20261028213801"></script>
-<script src="runtime/mm_fanending.js?v=20261028213801"></script>
-<script src="runtime/mm_bot.js?v=20261028213801"></script>
+<script src="runtime/mm_core.js?v=20261030164548"></script>
+<script src="runtime/mm_interp.js?v=20261030164548"></script>
+<script src="runtime/mm_builtins.js?v=20261030164548"></script>
+<script src="runtime/mm_audio.js?v=20261030164548"></script>
+<script src="runtime/mm_nbr.js?v=20261030164548"></script>
+<script src="runtime/mm_fanending.js?v=20261030164548"></script>
+<script src="runtime/mm_bot.js?v=20261030164548"></script>
+<script src="runtime/mm_cheat.js?v=20261030164548"></script>
 
 <!-- generated game package -->
-<script src="game/code.js?v=20261028213801"></script>
-<script src="game/sprites.js?v=20261028213801"></script>
-<script src="game/objects.js?v=20261028213801"></script>
-<script src="game/asset_ids.js?v=20261028213801"></script>
-<script src="game/rooms.js?v=20261028213801"></script>
-<script src="game/scripts.js?v=20261028213801"></script>
-<script src="game/sounds.js?v=20261028213801"></script>
-<script src="game/fonts.js?v=20261028213801"></script>
-<script src="game/assets.js?v=20261028213801"></script>
-<script src="game/tiles.js?v=20261028213801"></script>
+<script src="game/code.js?v=20261030164548"></script>
+<script src="game/sprites.js?v=20261030164548"></script>
+<script src="game/objects.js?v=20261030164548"></script>
+<script src="game/asset_ids.js?v=20261030164548"></script>
+<script src="game/rooms.js?v=20261030164548"></script>
+<script src="game/scripts.js?v=20261030164548"></script>
+<script src="game/sounds.js?v=20261030164548"></script>
+<script src="game/fonts.js?v=20261030164548"></script>
+<script src="game/assets.js?v=20261030164548"></script>
+<script src="game/tiles.js?v=20261030164548"></script>
 
 <script>
 (function () {
