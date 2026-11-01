@@ -319,7 +319,7 @@
       // высоту. Раньше пульс шёл только при Fly=1, поэтому полёт не
       // включался и Тейлз стабильно падал в каждую яму и в воду.
       if (!ground) {
-        if (h.vspeed > -0.9 && tap(KEY.Z, 7)) out.keys[KEY.Z] = 1;
+        if (h.vspeed > -0.9) out.keys[KEY.Z] = 1;
         if (gap && h.vspeed > 0.2) out.keys[KEY.Z] = 1;
       } else if (gap) {
         out.keys[KEY.RIGHT] = 1;

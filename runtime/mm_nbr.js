@@ -2183,6 +2183,21 @@
     // the same work in native JS once per step instead.
     MM.extraStep = function () {
       var room = MM.state.room;
+      // Tails: полёт в оригинале держится только на «свежем» нажатии Z
+      // (keyboard_check_pressed). При высоком FPS и буферизованном вводе
+      // импульс теряется, и Тейлз просто падает в каждую яму. Пока Z
+      // зажат — даём мягкую подъёмную силу, чтобы полёт был управляемым.
+      try {
+        var hero = null, list0 = MM.state.instances;
+        for (var i0 = 0; i0 < list0.length; i0++) {
+          var o0 = list0[i0];
+          if (o0 && !o0._destroyed && !o0._deactivated && o0.object_name === 'Tails') { hero = o0; break; }
+        }
+        var zHeld = !!(MM.input && MM.input.keys && MM.input.keys[90]);
+        if (hero && hero.Style === 2 && hero.Fly === 1 && hero.ground === 0 && zHeld) {
+          if (hero.vspeed > -2.2) hero.vspeed -= 0.35;
+        }
+      } catch (e0) { /* шаг не должен падать из-за ассиста */ }
       if (!room || room.name !== 'GHZ_7') return;
       var list = MM.state.instances;
       var checkers = MM.query('GHZ_Checker6');
