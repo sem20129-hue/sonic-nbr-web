@@ -2227,6 +2227,24 @@
           }
         }
       } catch (e2) { }
+      // Корень «за Тейлза невозможно играть»: в порте при приземлении флаг
+      // ground не выставляется в 1 (персонаж стоит на твёрдом полу, но игра
+      // считает, что он в воздухе). Из-за этого не срабатывает прыжок
+      // (нужен ground==1) и не стартует полёт — и человек, и бот просто
+      // упираются в стену. Восстанавливаем флаг по факту опоры.
+      try {
+        var heroG = null, listG = MM.state.instances;
+        for (var iG = 0; iG < listG.length; iG++) {
+          var oG = listG[iG];
+          if (oG && !oG._destroyed && !oG._deactivated && (oG.object_name === 'Tails' || oG.object_name === 'Pers_Obj')) { heroG = oG; break; }
+        }
+        if (heroG && (heroG.vspeed || 0) >= 0 && heroG.Fly !== 1) {
+          if (MM.placeMeeting(heroG, heroG.x, heroG.y + 2, 'Solid_Mask')) {
+            heroG.ground = 1;
+            if (heroG.vspeed > 0) heroG.vspeed = 0;
+          }
+        }
+      } catch (eG) { }
       if (!room || room.name !== 'GHZ_7') return;
       var list = MM.state.instances;
       var checkers = MM.query('GHZ_Checker6');
