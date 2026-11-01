@@ -634,22 +634,22 @@
     // Идём не «всегда вправо», а по стене: если впереди тупик, а сзади
     // свободно — разворачиваемся. Это же даёт нужный «налево после пружины».
     var goRight = bot.dir !== -1;
-    if (bot.dirUntil && bot.frame > bot.dirUntil) { bot.dir = 1; bot.dirUntil = 0; }
+    if (bot.dirHold && bot.frame > bot.dirHold) { bot.dirHold = 0; bot.dir = 1; }
     if (p.spring && (p.wallH > 46 || p.gap)) goRight = p.spring.x >= h.x;
     out.keys = {};
     out.keys[goRight ? KEY.RIGHT : KEY.LEFT] = 1;
 
-    // тупик впереди, свободно сзади -> разворот с кулдауном
-    if (p.wallH > 26) {
-      var behind = wallHeight(h, -18);
-      var ahead = wallHeight(h, 18);
-      if (ahead > 26 && behind < 20) {
-        bot.dir = -1; bot.dirUntil = bot.frame + 150;
-        out.keys = {}; out.keys[KEY.LEFT] = 1;
-        bot.stage = 'разворот';
+    // тупик впереди -> жёсткий разворот с удержанием направления
+    if (p.wallH > 22 && p.ground) {
+      var aheadW = wallHeight(h, goRight ? 18 : -18);
+      if (aheadW > 22) {
+        bot.dir = goRight ? -1 : 1;
+        bot.dirHold = bot.frame + 240;
+        goRight = bot.dir !== -1;
+        out.keys = {}; out.keys[goRight ? KEY.RIGHT : KEY.LEFT] = 1;
+        bot.stage = 'разворот ' + (goRight ? '→' : '←');
         return;
       }
-      if (behind > 26 && ahead < 20) { bot.dir = 1; bot.dirUntil = 0; }
     }
 
     // ---- враг рядом: прыжок на него ----------------------------------
