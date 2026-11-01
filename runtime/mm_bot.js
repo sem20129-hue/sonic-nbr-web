@@ -315,14 +315,20 @@
 
     // Тейлз: полёт над обрывом и для подъёма наверх.
     if (isTails) {
+      // Tails: в воздухе второе нажатие Z включает полёт, а пульс Z держит
+      // высоту. Раньше пульс шёл только при Fly=1, поэтому полёт не
+      // включался и Тейлз стабильно падал в каждую яму и в воду.
       if (!ground) {
-        if (h.Fly === 1) {
-          // Держим высоту короткими нажатиями Z (каждое даёт -2 vspeed).
-          if (h.vspeed > -0.6 && tap(KEY.Z, 6)) out.keys[KEY.Z] = 1;
-          if (gap && h.vspeed > 1.5) out.keys[KEY.Z] = 1;
-        } else if (h.vspeed > 0.4 && (gap || (wall && !ground))) {
-          if (tap(KEY.Z, 10)) out.keys[KEY.Z] = 1;
-        }
+        if (h.vspeed > -0.9 && tap(KEY.Z, 7)) out.keys[KEY.Z] = 1;
+        if (gap && h.vspeed > 0.2) out.keys[KEY.Z] = 1;
+      } else if (gap) {
+        out.keys[KEY.RIGHT] = 1;
+        if (tap(KEY.Z, 10)) out.keys[KEY.Z] = 1;
+      }
+      // Застрял у кромки — отойти назад и взять разбег.
+      if (ground && bot.stuck > 70 && (bot.stuck % 90) < 30) {
+        out.keys[KEY.RIGHT] = 0;
+        out.keys[KEY.LEFT] = 1;
       }
     }
 

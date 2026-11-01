@@ -60,13 +60,29 @@
     if (!hasImage) return null;
     if (!f._tried) {
       f._tried = true;
-      var im = new Image();
-      im.onload = function () { f.img = im; };
-      im.onerror = function () { f.img = null; };
-      im.src = f.src;
+      loadWithRetry(f, function (im) { f.img = im; });
     }
     return null;
   };
+
+  // GitHub Pages occasionally answers a PNG with 503 (rate limit / cold CDN).
+  // A single failed request used to leave the frame blank for the whole
+  // session and, in the worst case, the caller painted a black box in its
+  // place. Retry a few times with a cache-busting query before giving up.
+  function loadWithRetry(holder, done) {
+    var tries = holder._retries || 0;
+    var src = holder.src;
+    var im = new Image();
+    im.onload = function () { holder._failed = false; done(im); };
+    im.onerror = function () {
+      holder._failed = true;
+      if (tries >= 4) { done(null); return; }
+      holder._retries = tries + 1;
+      var url = src + (src.indexOf('?') >= 0 ? '&' : '?') + 'retry=' + holder._retries;
+      setTimeout(function () { holder.src = src; loadWithRetry(holder, done); }, 250 * (tries + 1));
+    };
+    im.src = tries ? src + (src.indexOf('?') >= 0 ? '&' : '?') + 'retry=' + tries : src;
+  }
 
   // Preload every frame of a sprite (used when a room is loaded).
   MM.preloadSprite = function (spr) {
@@ -87,8 +103,20 @@
     var im = null;
     if (hasImage) {
       im = new Image();
+      var holder = { src: src, _retries: 0 };
       im.onload = function () { im._ready = true; };
-      im.onerror = function () { im._failed = true; };
+      im.onerror = function () {
+        im._failed = true;
+        if (holder._retries < 4) {
+          holder._retries++;
+          setTimeout(function () {
+            var again = new Image();
+            again.onload = function () { im._ready = true; im._failed = false; MM._bgCache[src] = again; };
+            again.onerror = function () { im._failed = true; };
+            again.src = src + (src.indexOf('?') >= 0 ? '&' : '?') + 'retry=' + holder._retries;
+          }, 250 * holder._retries);
+        }
+      };
       im.src = src;
     }
     MM._bgCache[src] = im;
@@ -627,10 +655,7 @@
     if (!hasImage) return null;
     if (!f._tried) {
       f._tried = true;
-      var im = new Image();
-      im.onload = function () { f.img = im; };
-      im.onerror = function () { f.img = null; };
-      im.src = f.src;
+      loadWithRetry(f, function (im) { f.img = im; });
     }
     return null;
   };
