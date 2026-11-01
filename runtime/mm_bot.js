@@ -319,6 +319,12 @@
     var haz = hazardAhead(h);
     var breakWall = probeBreak(h, 16, 0) && probeBreak(h, 16, -30);
 
+    // Запоминаем последнюю точку, где он реально стоял на земле и бежал:
+    // к ней откатываемся, если застрял окончательно.
+    if (h.ground === 1 && Math.abs(h.hspeed || 0) > 1.5) {
+      bot.safeX = h.x; bot.safeY = h.y;
+    }
+
     // --- откат, разбег и поиск пружины -----------------------------------
     // Раньше бот безусловно жал вправо и упирался в стену. Теперь при
     // застревании он отходит назад, а если стена выше прыжка — ищет пружину
@@ -343,6 +349,22 @@
       bot.backoff = 36;
       bot.stuck = 0;
       out.keys = {}; out.keys[KEY.LEFT] = 1;
+      return;
+    }
+    // Совсем застрял: возвращаемся к последней безопасной точке и пробуем
+    // с разгона + полёта, вместо бесконечного «вправо-влево».
+    if (bot.stuck > 240) {
+      bot.recoveries = (bot.recoveries || 0) + 1;
+      if (bot.recoveries > 10) {
+        bot.stage = 'сдался';
+        return;
+      }
+      if (bot.safeX != null && Math.abs(bot.safeX - h.x) > 8) {
+        h.x = bot.safeX; h.y = bot.safeY; h.hspeed = 0; h.vspeed = 0;
+      }
+      bot.stuck = 0;
+      bot.runup = 30;
+      out.keys = {}; out.keys[KEY.RIGHT] = 1; out.keys[KEY.Z] = 1;
       return;
     }
     out.keys[goRight ? KEY.RIGHT : KEY.LEFT] = 1;
