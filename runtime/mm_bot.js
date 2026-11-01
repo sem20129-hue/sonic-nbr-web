@@ -533,7 +533,7 @@
     // обрабатывает игра — это часть прохождения).
     if (bot.assist && (h.rings || 0) < 8) h.rings = 30;
 
-    driveHero(h);
+    driveHero2(h);
 
     // Застряли надолго: отходим назад и пробуем ещё раз.
     if (bot.stuck > 110 && bot.stuck % 40 === 0) {
@@ -544,6 +544,154 @@
       if (!probe(h, 8, 0)) h.x += 4;
     }
   }
+
+  // =====================================================================
+  //  Восприятие: лучи вперёд/вверх/вниз + поиск объектов вокруг
+  // =====================================================================
+  function ray(h, dx, dy) { return probe(h, dx, dy); }
+
+  function wallHeight(h, dx) {
+    for (var d = 6; d <= 190; d += 8) if (ray(h, dx, -d)) return d;
+    return 0;
+  }
+
+  function floorAt(h, dx) {
+    for (var d = 8; d <= 190; d += 8) if (ray(h, dx, d)) return d;
+    return -1;
+  }
+
+  function gapWidth(h) {
+    for (var dx = 16; dx <= 240; dx += 8) if (floorAt(h, dx) > 0) return dx;
+    return -1;               // дальше 240 px земли нет — считаем пропастью
+  }
+
+  function ceiling(h) {
+    for (var d = 20; d <= 150; d += 10) if (ray(h, 0, -d)) return d;
+    return 0;
+  }
+
+  function nearestClass(h, re, range, maxDy) {
+    var best = null, bd = range, l = liveList();
+    for (var i = 0; i < l.length; i++) {
+      var o = l[i];
+      if (!o || o._destroyed || o._deactivated || o === h) continue;
+      var n = o.object_name || '';
+      if (!re.test(n)) continue;
+      var dx = o.x - h.x, dy = Math.abs(o.y - h.y);
+      if (dx < -30 || dx > range || dy > maxDy) continue;
+      if (dx < bd) { bd = dx; best = o; }
+    }
+    return best;
+  }
+
+  function perceive(h) {
+    var p = {};
+    p.ground = h.ground === 1;
+    p.vspeed = h.vspeed || 0;
+    p.wallH = wallHeight(h, Math.max(10, Math.abs(h.hspeed || 0) + 8));
+    p.ceilH = ceiling(h);
+    p.gap = p.ground && (floorAt(h, 24) < 0 || floorAt(h, 40) < 0);
+    p.gapW = gapWidth(h);
+    p.spring = nearestClass(h, /Spring/i, 260, 200);
+    p.enemy = nearestClass(h, /Crab|Fish|Buzz|Bee|Robot|Robo|Mecha|Motobug|Chopper|Badnik|SpikeBall/i, 120, 70);
+    p.spike = nearestClass(h, /Spike/i, 110, 60);
+    p.ring = nearestClass(h, /^Ring$/i, 200, 120);
+    return p;
+  }
+
+  // =====================================================================
+  //  Поведение: бег, прыжок, клубок, полёт, пружина, отход
+  // =====================================================================
+  function driveHero2(h) {
+    var p = perceive(h);
+    var isTails = h.Style === 2;
+    var canFly = isTails && p.ceilH === 0;
+
+    // запоминаем безопасную точку
+    if (p.ground && Math.abs(h.hspeed || 0) > 1.2) { bot.safeX = h.x; bot.safeY = h.y; }
+
+    // откат/разбег — приоритет выше всего
+    if (bot.backoff > 0) {
+      bot.backoff--;
+      out.keys = {}; out.keys[KEY.LEFT] = 1;
+      if (bot.backoff === 0) bot.runup = 18;
+      return;
+    }
+    if (bot.runup > 0) { bot.runup--; out.keys = {}; out.keys[KEY.RIGHT] = 1; return; }
+
+    // возврат после глухого застревания
+    if (bot.stuck > 240) {
+      bot.recoveries = (bot.recoveries || 0) + 1;
+      if (bot.safeX != null && Math.abs(bot.safeX - h.x) > 8) {
+        h.x = bot.safeX; h.y = bot.safeY; h.hspeed = 0; h.vspeed = 0;
+      }
+      bot.stuck = 0; bot.runup = 26;
+      out.keys = {}; out.keys[KEY.RIGHT] = 1; out.keys[KEY.Z] = 1;
+      return;
+    }
+
+    // ---- выбор направления -------------------------------------------
+    var goRight = true;
+    if (p.spring && (p.wallH > 46 || p.gap)) goRight = p.spring.x >= h.x;
+    out.keys = {};
+    out.keys[goRight ? KEY.RIGHT : KEY.LEFT] = 1;
+
+    // ---- враг рядом: прыжок на него ----------------------------------
+    if (p.enemy && p.ground && p.enemy.x >= h.x - 10) {
+      bot.stage = 'атака';
+      out.keys[KEY.RIGHT] = 1;
+      if (h.x + 34 >= p.enemy.x && tap(KEY.Z, 9)) out.keys[KEY.Z] = 1;
+      return;
+    }
+
+    // ---- шипы: перепрыгнуть ------------------------------------------
+    if (p.spike && p.spike.x - h.x < 60 && p.ground) {
+      bot.stage = 'прыжок через шипы';
+      if (tap(KEY.Z, 10)) out.keys[KEY.Z] = 1;
+      return;
+    }
+
+    // ---- стена --------------------------------------------------------
+    if (p.wallH > 20) {
+      bot.stage = 'стена ' + p.wallH;
+      if (p.spring && Math.abs(p.spring.x - h.x) < 40) {
+        // стоим на пружине — просто прыгаем вверх
+        if (tap(KEY.Z, 12)) out.keys[KEY.Z] = 1;
+        return;
+      }
+      if (p.wallH <= 56 && p.ground) { if (tap(KEY.Z, 9)) out.keys[KEY.Z] = 1; return; }
+      if (canFly) {
+        bot.stage = 'полёт через стену';
+        if (h.Fly !== 1) { if (tap(KEY.Z, 7)) out.keys[KEY.Z] = 1; }
+        else out.keys[KEY.Z] = 1;
+        return;
+      }
+      if (p.ground) { bot.backoff = 30; bot.stuck = 0; out.keys = {}; out.keys[KEY.LEFT] = 1; return; }
+      return;
+    }
+
+    // ---- пропасть -----------------------------------------------------
+    if (p.gap) {
+      var wide = p.gapW < 0 || p.gapW > 110;
+      if (!wide) { bot.stage = 'прыжок через яму'; if (tap(KEY.Z, 9)) out.keys[KEY.Z] = 1; return; }
+      if (canFly) {
+        bot.stage = 'полёт через яму';
+        if (h.Fly !== 1) { if (tap(KEY.Z, 7)) out.keys[KEY.Z] = 1; }
+        else out.keys[KEY.Z] = 1;
+        return;
+      }
+      if (p.ground) { bot.backoff = 34; bot.stuck = 0; out.keys = {}; out.keys[KEY.LEFT] = 1; return; }
+    }
+
+    // ---- клубок: под уклон / в толпу ----------------------------------
+    if (h.rolling != 1 && p.ground && h.hspeed > 4 && bot.frame % 90 === 0 && h.Fly !== 1) {
+      out.keys[KEY.DOWN] = 1;
+      bot.stage = 'клубок';
+    } else {
+      bot.stage = 'бег';
+    }
+  }
+
 
   function pressedOnce(code) {
     clearOut();
