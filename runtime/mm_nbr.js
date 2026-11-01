@@ -2227,6 +2227,17 @@
           }
         }
       } catch (e2) { }
+      // Водопады GHZ: спрайт 31 px шириной, а расставлены через 32 px. В
+      // оригинале щель в 1 px незаметна, но при нашем апскейле x4 она
+      // превращается в тёмную полосу — та самая «гребёнка/вирус». Растягиваем
+      // каждый лист ровно на этот пиксель, чтобы стена воды стала сплошной.
+      try {
+        var falls = MM.query('GHZ_Waterfall2');
+        for (var wf = 0; wf < falls.length; wf++) {
+          var f2 = falls[wf];
+          if (f2 && f2.image_xscale === 1) f2.image_xscale = 32 / 31;
+        }
+      } catch (e3) { }
       if (!room || room.name !== 'GHZ_7') return;
       var list = MM.state.instances;
       var checkers = MM.query('GHZ_Checker6');

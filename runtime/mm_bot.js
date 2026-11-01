@@ -58,6 +58,7 @@
     roomPath: [],
     startX: 0, maxX: 0,
     lastX: 0, stuck: 0, bestX: 0,
+    backoff: 0, runup: 0,
     lastRoomAt: 0,
     stage: 'запуск',
     note: '',
@@ -104,6 +105,21 @@
   }
 
   function dialogInst() { return findInst('SW'); }
+
+  // Ближайшая пружина в радиусе: нужна, когда стена выше прыжка, а Тейлз не
+  // может долететь (или пружина стоит слева от героя).
+  function findSpring(h, maxDist) {
+    var l = liveList(), best = null, bestD = maxDist;
+    for (var i = 0; i < l.length; i++) {
+      var o = l[i];
+      if (!o || o._destroyed || o._deactivated) continue;
+      var n = o.object_name || '';
+      if (!/Spring/i.test(n)) continue;
+      var d = Math.abs(o.x - h.x);
+      if (d < bestD && Math.abs(o.y - h.y) < 260) { bestD = d; best = o; }
+    }
+    return best;
+  }
 
   // ---------------------------------------------------------------------
   // Проба коллизий
@@ -294,7 +310,7 @@
     var ground = h.ground === 1;
 
     // Основное движение — вправо (все уровни игры построены слева направо).
-    out.keys[KEY.RIGHT] = 1;
+    var goRight = true;   // направление выбирается ниже, после проверки стены
 
     // Стена впереди / обрыв / опасность.
     var wall = probe(h, 16, 0) || probe(h, 15, -26) || probe(h, 20, -52);
@@ -302,6 +318,34 @@
     var gap = ground && !groundAhead(h, 40) && !groundAhead(h, 26);
     var haz = hazardAhead(h);
     var breakWall = probeBreak(h, 16, 0) && probeBreak(h, 16, -30);
+
+    // --- откат, разбег и поиск пружины -----------------------------------
+    // Раньше бот безусловно жал вправо и упирался в стену. Теперь при
+    // застревании он отходит назад, а если стена выше прыжка — ищет пружину
+    // (в том числе слева от себя) и идёт к ней.
+    if (bot.backoff > 0) {
+      bot.backoff--;
+      out.keys = {}; out.keys[KEY.LEFT] = 1;
+      if (bot.backoff === 0) bot.runup = 16;
+      return;
+    }
+    if (bot.runup > 0) {
+      bot.runup--;
+      out.keys = {}; out.keys[KEY.RIGHT] = 1;
+      if (bot.runup % 6 === 0) out.keys[KEY.Z] = 1;
+      return;
+    }
+    var tallWall = wall && (probe(h, 16, -70) || probe(h, 16, -110));
+    var spring = null;
+    if (tallWall || (bot.stuck > 50 && ground)) spring = findSpring(h, 560);
+    if (spring) goRight = spring.x >= h.x;
+    if (bot.stuck > 80 && !spring) {
+      bot.backoff = 36;
+      bot.stuck = 0;
+      out.keys = {}; out.keys[KEY.LEFT] = 1;
+      return;
+    }
+    out.keys[goRight ? KEY.RIGHT : KEY.LEFT] = 1;
 
     // Прыжок
     if (ground && (wall || gap || (haz && haz.x - h.x < 52))) {
