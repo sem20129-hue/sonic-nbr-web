@@ -2198,6 +2198,35 @@
           if (hero.vspeed > -2.2) hero.vspeed -= 0.35;
         }
       } catch (e0) { /* шаг не должен падать из-за ассиста */ }
+      // Универсальная анти-заморозка: если герой стоит на месте без ground и
+      // без скорости (упирается в стену/застрял в геометрии), даём короткий
+      // подскок, а если это не помогло — поднимаем его на свободное место.
+      try {
+        var hero2 = null, list1 = MM.state.instances;
+        for (var i1 = 0; i1 < list1.length; i1++) {
+          var o1 = list1[i1];
+          if (o1 && !o1._destroyed && !o1._deactivated && (o1.object_name === 'Tails' || o1.object_name === 'Pers_Obj')) { hero2 = o1; break; }
+        }
+        if (hero2 && hero2.Move !== 0 && hero2.Out !== 1 && hero2.Act !== 1) {
+          var still = Math.abs(hero2.hspeed || 0) < 0.05 && Math.abs(hero2.vspeed || 0) < 0.05;
+          hero2._still = still ? (hero2._still || 0) + 1 : 0;
+          if (hero2._still > 90) {
+            hero2._stuckTries = (hero2._stuckTries || 0) + 1;
+            var solidBelow = false, freeAbove = false;
+            try {
+              solidBelow = !!MM.placeMeeting(hero2, hero2.x, hero2.y + 4, 'Solid_Mask');
+              freeAbove = !MM.placeMeeting(hero2, hero2.x, hero2.y - 24, 'Solid_Mask');
+            } catch (e1) { }
+            if (hero2._stuckTries >= 3 && freeAbove) {
+              hero2.y -= 32;            // выбираемся из кармана
+              hero2.vspeed = -2;
+            } else {
+              hero2.vspeed = solidBelow ? -4.5 : -2.5;
+            }
+            hero2._still = 0;
+          }
+        }
+      } catch (e2) { }
       if (!room || room.name !== 'GHZ_7') return;
       var list = MM.state.instances;
       var checkers = MM.query('GHZ_Checker6');
